@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.007 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.008 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -202,6 +202,14 @@ input[type=date]{font-family:var(--f-mono)}
 .gcal-list{display:flex;flex-direction:column;gap:8px}
 .gcal-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
 .gcal-item .nm{font-weight:600;font-size:.9rem;min-width:0;overflow-wrap:anywhere}
+/* expiry list review */
+.lrows{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lrow{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.88rem}
+.lrow:last-child{border-bottom:0}
+.lrow input{width:20px;height:20px;accent-color:var(--accent)}
+.lrow .tag{min-width:54px;text-align:center}
+.lname{min-width:0;display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.lst{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 /* family */
 .fam-sum{display:flex;flex-direction:column;gap:8px}
 .member{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:var(--r);border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 55%,var(--bg))}
@@ -252,7 +260,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.007</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.008</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -406,7 +414,7 @@ input[type=date]{font-family:var(--f-mono)}
 </nav>
 
 <input type="file" id="scanCam" accept="image/*" capture="environment" hidden>
-<input type="file" id="scanPick" accept="image/*,application/pdf" hidden>
+<input type="file" id="scanPick" accept="image/*,application/pdf" multiple hidden>
 <input type="file" id="edCam" accept="image/*" capture="environment" hidden>
 <input type="file" id="edFile" accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.heic" multiple hidden>
 <div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
@@ -416,7 +424,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.007', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.008', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -431,6 +439,11 @@ var PRESETS=[
  {k:'opc',g:'Aviation',name:'Operator Proficiency Check (OPC)',code:'OPC',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:true},
  {k:'line',g:'Aviation',name:'Line Check',code:'LC',auth:'Operator / LTC',valid:12,eom:true,thr:45,win:90,crit:true},
  {k:'lvo',g:'Aviation',name:'LVO Qualification (CAT II/III)',code:'LVO',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:false,hint:'Expiry restricts low-visibility operations. Operator base-month rules vary: verify against the certificate.'},
+ {k:'etops',g:'Aviation',name:'ETOPS / EDTO Qualification',code:'ETOPS',auth:'Operator',valid:12,eom:true,thr:45,win:0,crit:false},
+ {k:'avsec',g:'Aviation',name:'Aviation Security Training',code:'SEC',auth:'Operator',valid:12,eom:true,thr:30,win:0,crit:true},
+ {k:'sms',g:'Aviation',name:'SMS Training',code:'SMS',auth:'Operator',valid:24,eom:true,thr:30,win:0,crit:false},
+ {k:'recl',g:'Aviation',name:'Landing Recency (3 in 90 days)',code:'LAND',auth:'',valid:0,eom:false,thr:14,win:0,crit:true,hint:'3 take-offs and landings in the preceding 90 days. The date moves with every sector flown: update it from the crew app.'},
+ {k:'rect',g:'Aviation',name:'Take-off Recency (3 in 90 days)',code:'TOFF',auth:'',valid:0,eom:false,thr:14,win:0,crit:true},
  {k:'crm',g:'Aviation',name:'CRM Recurrent',code:'CRM',auth:'Operator',valid:12,eom:true,thr:30,win:0,crit:true},
  {k:'sep',g:'Aviation',name:'SEP / Emergency Procedures',code:'SEP',auth:'Operator',valid:12,eom:true,thr:30,win:90,crit:true},
  {k:'dg',g:'Aviation',name:'Dangerous Goods',code:'DG',auth:'Operator',valid:24,eom:true,thr:30,win:90,crit:true},
@@ -519,7 +532,7 @@ function applyTheme(){
 
 /* ---------- family ---------- */
 var RELS=['Spouse','Son','Daughter','Father','Mother','Brother','Sister','Other'];
-var AV_ONLY={med1:1,lic:1,lpc:1,opc:1,line:1,crm:1,sep:1,dg:1,elp:1,sec:1};
+var AV_ONLY={med1:1,lic:1,lpc:1,opc:1,line:1,crm:1,sep:1,dg:1,elp:1,sec:1,lvo:1,etops:1,avsec:1,sms:1,recl:1,rect:1};
 function mine(){return S.docs.filter(function(d){return !d.owner})}
 function famDocs(mid){return S.docs.filter(function(d){return mid?d.owner===mid:!!d.owner})}
 function member(id){return S.family.find(function(m){return m.id===id})}
@@ -939,7 +952,8 @@ function canvasBlob(c,type,q){return new Promise(function(res){c.toBlob(function
 function grayHist(c){var x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),p=d.data,h=new Array(256).fill(0),g;for(var i=0;i<p.length;i+=4){g=(p[i]*.299+p[i+1]*.587+p[i+2]*.114)|0;p[i]=g;h[g]++}return {x:x,d:d,p:p,h:h,n:p.length/4}}
 function enhance(src){var c=drawScaled(src,2600,2600),G=grayHist(c),lo=0,hi=255,acc=0,i;
   for(i=0;i<256;i++){acc+=G.h[i];if(acc>G.n*0.01){lo=i;break}}acc=0;for(i=255;i>=0;i--){acc+=G.h[i];if(acc>G.n*0.01){hi=i;break}}
-  var r=Math.max(1,hi-lo);for(i=0;i<G.p.length;i+=4){var v=Math.max(0,Math.min(255,(G.p[i]-lo)*255/r));G.p[i]=G.p[i+1]=G.p[i+2]=v}G.x.putImageData(G.d,0,0);return c}
+  var r=Math.max(1,hi-lo),sum=0;for(i=0;i<G.p.length;i+=4){var v=Math.max(0,Math.min(255,(G.p[i]-lo)*255/r));G.p[i]=v;sum+=v}var inv=sum/G.n<110;
+  for(i=0;i<G.p.length;i+=4){var w=inv?255-G.p[i]:G.p[i];G.p[i]=G.p[i+1]=G.p[i+2]=w}G.x.putImageData(G.d,0,0);return c}
 function binarize(c){var G=grayHist(c),sum=0,sB=0,wB=0,max=0,th=127,i;for(i=0;i<256;i++)sum+=i*G.h[i];
   for(i=0;i<256;i++){wB+=G.h[i];if(!wB)continue;var wF=G.n-wB;if(!wF)break;sB+=i*G.h[i];var mB=sB/wB,mF=(sum-sB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>max){max=v;th=i}}
   for(i=0;i<G.p.length;i+=4){var g=G.p[i]>th?255:0;G.p[i]=G.p[i+1]=G.p[i+2]=g}G.x.putImageData(G.d,0,0);return c}
@@ -1067,6 +1081,53 @@ function parseCheckTable(text){
   return {check:checks[0].iso,valid:vmax.iso,rows:0,mode:'columns'};
 }
 var CHECK_TYPES=/^(lpc|opc|line|lvo|sep|crm|dg)$/;
+/* ---------- expiry lists (crew app / roster system screenshots): CODE  dd/mm/yyyy per row ---------- */
+var LIST_MAP={MED:'med1',MEDICAL:'med1',OPC:'opc',LPC:'lpc',ALC:'line',LC:'line',LINE:'line',CRM:'crm',DGR:'dg',DG:'dg',SEP:'sep',SEPD:'sep',SEC:'avsec',AVSEC:'avsec',ELP:'elp',ELP4:'elp',ELP5:'elp',ELP6:'elp',ETOPS:'etops',EDTO:'etops',SMS:'sms',PASS:'ppt',PPT:'ppt',PASSPORT:'ppt',LICN:'lic',LIC:'lic',LICENCE:'lic',LICENSE:'lic',LAND:'recl',TOFF:'rect',LVO:'lvo',LVTO:'lvo',CAT3:'lvo',VISA:'visa',RP:'id'};
+var LIST_NAME={ALC:'Annual Line Check (ALC)',SEPD:'SEP Drills (SEPD)',ELP4:'ELP Level 4',ELP5:'ELP Level 5',ELP6:'ELP Level 6',SEC:'Aviation Security Training (SEC)'};
+function parseExpiryList(text){
+  var T=normDigits(String(text||'')).toUpperCase(),out=[],seen={};
+  T.split(/\n+/).forEach(function(line){
+    var m=line.match(/^[^A-Z0-9]*([A-Z][A-Z0-9]{1,9})\b[^0-9A-Z]{0,24}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);if(!m)return;
+    var ds=findDates(m[2],'');if(!ds.length||seen[m[1]])return;seen[m[1]]=1;out.push({code:m[1],iso:ds[0].iso});
+  });
+  if(out.length<3){var codes=(T.match(/^[^A-Z0-9]*([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/gm)||[]).map(function(x){return x.replace(/[^A-Z0-9]/g,'')}),dates=findDates(text,'').sort(function(a,b){return a.idx-b.idx});
+    if(codes.length>=3&&codes.length===dates.length)out=codes.map(function(c,i){return {code:c,iso:dates[i].iso}})}
+  var known=out.filter(function(x){return LIST_MAP[x.code]}).length;
+  return out.length>=3&&known>=2?out:null;
+}
+function listMatch(row){
+  var my=mine();
+  var byCode=my.filter(function(d){return d.listCode===row.code||(d.code||'').toUpperCase()===row.code});
+  if(byCode.length)return byCode[0];
+  if(!row.preset||row.preset==='custom')return null;
+  var byPreset=my.filter(function(d){return d.preset===row.preset&&!d.listCode});
+  if(row.code==='SEPD')return null;
+  return byPreset.length===1?byPreset[0]:null;
+}
+function listSheet(rows){
+  rows.forEach(function(r){r.preset=LIST_MAP[r.code]||'custom';r.doc=listMatch(r);
+    r.state=!r.doc?'new':r.doc.expiry===r.iso?'same':isoN(r.iso)<isoN(r.doc.expiry)?'earlier':'update';r.on=r.state==='new'||r.state==='update'});
+  rows.sort(function(a,b){return isoN(a.iso)-isoN(b.iso)});
+  LISTROWS=rows;
+  var n=function(st){return rows.filter(function(r){return r.state===st}).length};
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Expiry list: '+rows.length+' items</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<p class="muted">'+n('new')+' new · '+n('update')+' updates · '+n('same')+' unchanged'+(n('earlier')?' · <b style="color:var(--warn)">'+n('earlier')+' earlier than your record</b>':'')+'. Ticked rows are applied to My docs.</p>'+
+   '<div class="lrows" style="margin-top:12px">'+rows.map(function(r,i){var p=presetBy(r.preset)||{},nm=r.doc?r.doc.name:(LIST_NAME[r.code]||p.name||r.code);
+     var st={new:'<span class="pill ok">New</span>',update:'<span class="pill warn">Update</span><span class="note mono">was '+fmt(r.doc&&r.doc.expiry)+'</span>',same:'<span class="pill neutral">No change</span>',earlier:'<span class="pill bad">Earlier</span><span class="note mono">record '+fmt(r.doc&&r.doc.expiry)+'</span>'}[r.state];
+     return '<label class="lrow"><input type="checkbox" data-li="'+i+'"'+(r.on?' checked':'')+(r.state==='same'?' disabled':'')+'><span class="tag code">'+esc(r.code)+'</span><span class="lname">'+esc(nm)+'<span class="lst">'+st+'</span></span><b class="mono">'+fmt(r.iso)+'</b></label>'}).join('')+'</div>'+
+   (n('earlier')?'<p class="note" style="margin-top:10px">Rows marked Earlier would shorten a validity you already hold (for example an ELP date printed in your licence). They are left unticked: tick only if the list is right.</p>':'')+
+   '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="list-apply">Apply ticked</button></div>');
+}
+var LISTROWS=null;
+function applyList(){
+  var rows=(LISTROWS||[]).filter(function(r,i){var cb=document.querySelector('[data-li="'+i+'"]');return cb&&cb.checked&&!cb.disabled}),add=0,upd=0,today=nIso(todayN());
+  rows.forEach(function(r){
+    if(r.doc){var d=S.docs.find(function(x){return x.id===r.doc.id});if(!d)return;if(d.expiry!==r.iso){d.history=(d.history||[]).concat([{expiry:d.expiry,replaced:today}]).slice(-10);d.expiry=r.iso;upd++}d.listCode=r.code;d.sample=false;d.updated=new Date().toISOString();return}
+    var p=presetBy(r.preset)||presetBy('custom');
+    S.docs.push({id:uid(),owner:'',preset:r.preset,listCode:r.code,name:LIST_NAME[r.code]||p.name||r.code,category:p.g==='Personal'&&r.preset==='custom'?'Aviation':p.g,code:(r.preset==='custom'?r.code:p.code).slice(0,5),authority:p.auth||'',ref:'',issue:'',validity:p.valid?String(p.valid):'',eom:!!p.eom,expiry:r.iso,threshold:p.thr==null?S.settings.threshold:p.thr,window:p.win||0,critical:!!p.crit,notes:'From crew expiry list, '+fmt(todayN())+'.',files:[],updated:new Date().toISOString()});add++;
+  });
+  save();closeSheet();UI.filter='all';saveUI();showTab('docs');renderAll();toast(add+' added, '+upd+' updated');LISTROWS=null;
+}
 var AC_RE=/\b(A3[1-5]\d|A220|A330|A350|A380|B7[0-9]7|B737|ATR ?72|E1[79]0|E19[05]|Q400)\b/i;
 function analyse(text,mrz,method){
   var t=todayN(),r={preset:null,name:'',expiry:'',issue:'',ref:'',issuer:'',method:method,conf:'none',cands:[],text:String(text||''),mrz:mrz||null};
@@ -1085,7 +1146,8 @@ function analyse(text,mrz,method){
   if(!mrz&&r.preset==='elp'&&r.conf!=='medium'){var lv=(L.match(/levels?\s*[:\-]?\s*([456])\b/)||[])[1];
     var td=ds.filter(function(d){return d.n<=t}).sort(function(a,b){return b.n-a.n})[0];
     if(lv&&td){r.issue=td.iso;r.name='ELP Level '+lv;if(lv==='6'){r.expiry='';r.conf='low';r.note='Level 6 needs no re-test.'}else{r.expiry=nIso(isoN(addMonths(td.iso,lv==='4'?48:72,false))-1);r.conf='medium';r.calc='ELP Level '+lv+': '+(lv==='4'?4:6)+' years from the '+fmt(td.iso)+' test'}}}
-  if(!mrz&&CHECK_TYPES.test(r.preset||'')){var tb=parseCheckTable(r.text);
+  if(!mrz){var lst=parseExpiryList(r.text);if(lst)r.list=lst}
+  if(!mrz&&!r.list&&CHECK_TYPES.test(r.preset||'')){var tb=parseCheckTable(r.text);
     if(tb){r.issue=tb.check;r.expiry=tb.valid;r.conf='medium';r.calc='Latest entry'+(tb.rows>1?' of '+tb.rows:'')+': checked '+fmt(tb.check)+', valid until '+fmt(tb.valid);
       if(!r.cands.some(function(c){return c.iso===tb.valid}))r.cands.unshift({iso:tb.valid,n:isoN(tb.valid),label:'latest entry'})}}
   if(!mrz&&CHECK_TYPES.test(r.preset||'')&&!r.calc&&(r.conf==='low'||r.conf==='none')&&r.text.trim()){r.handwritten=true;r.expiry='';r.conf='low'}
@@ -1180,7 +1242,7 @@ function scanSheet(){
    '<p class="muted">AeroDocs reads the document on this device, identifies the type and finds the expiry date. The image or PDF is attached to the record.</p>'+
    '<div class="scan-opts"><label class="btn primary big" for="scanCam">'+IC.cam+'Take photo</label><label class="btn big" for="scanPick">'+IC.up+'Photo, PDF or file</label></div>'+
    '<button class="btn" data-act="paste-scan" style="width:100%;margin-bottom:12px">Paste text from iPhone Live Text (best for handwriting)</button>'+
-   '<ul class="tips"><li>Lay the document flat in good light and fill the frame.</li><li>Passport: include the two lines of &lt;&lt;&lt; characters at the bottom of the photo page.</li><li>ID or residence card: scan the side with the three &lt;&lt;&lt; lines.</li><li>Medical certificates and check forms: the emailed PDF reads best.</li><li>Scanning a renewed document offers to update the existing record.</li></ul>');
+   '<ul class="tips"><li>Lay the document flat in good light and fill the frame.</li><li>Passport: include the two lines of &lt;&lt;&lt; characters at the bottom of the photo page.</li><li>ID or residence card: scan the side with the three &lt;&lt;&lt; lines.</li><li>Medical certificates and check forms: the emailed PDF reads best.</li><li>Scanning a renewed document offers to update the existing record.</li><li>Expiry list from your crew app: select all its screenshots at once; every row is matched to your records.</li></ul>');
 }
 function pasteSheet(){
   openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Paste Live Text</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
@@ -1197,13 +1259,16 @@ async function scanNew(list){
   var job={docId:uid(),cancel:false,metas:[]};SCAN=job;progSheet();
   var r=null,primary=null;
   try{
-    for(var i=0;i<files.length;i++){spSet('Preparing '+files[i].name,0);var p=await prepare(files[i]);if(job.cancel)break;
-      await storeFile(p,p.meta,job.docId);job.metas.push(p.meta);if(!primary&&p.ocr)primary=p;
+    var preps=[];for(var i=0;i<files.length;i++){spSet('Preparing '+files[i].name,0);var p=await prepare(files[i]);if(job.cancel)break;
+      await storeFile(p,p.meta,job.docId);job.metas.push(p.meta);if(p.ocr)preps.push(p);if(!primary&&p.ocr)primary=p;
       if(p.meta.thumb&&$('#spThumb')){$('#spThumb').src=p.meta.thumb;$('#spThumb').hidden=false}}
     if(!job.cancel&&primary){try{r=await detectFrom(primary,spSet);if(r.rotation){spSet('Straightening image',0.9);await applyRotation(primary.meta,r.rotation)}}catch(e){toast(ocrErrMsg(e));r=analyse('',null,'none')}}
   }catch(e){toast(e.message||'Could not read the file')}
   if(job.cancel||SCAN!==job){job.metas.forEach(function(m){FS.del(m.id).catch(function(){})});return}
+  if(r&&r.list&&!job.cancel){var seenL={};r.list.forEach(function(x){seenL[x.code]=1});
+    for(var pi=1;pi<preps.length;pi++){spSet('Reading screenshot '+(pi+1)+' of '+preps.length,0);try{var rx=await detectFrom(preps[pi],spSet);(rx.list||[]).forEach(function(x){if(!seenL[x.code]){seenL[x.code]=1;r.list.push(x)}})}catch(e){}}}
   SCAN=null;
+  if(r&&r.list){job.metas.forEach(function(m){FS.del(m.id).catch(function(){})});listSheet(r.list);return}
   if(!job.metas.length){closeSheet();return}
   r=r||analyse('',null,'none');
   var nr=function(s){return String(s||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()};
@@ -1371,8 +1436,9 @@ document.addEventListener('click',function(ev){
    case 'lt-read':var lt=$('#ltText').value;if(!lt.trim()){toast('Paste the copied text first');break}
      var pr0=$('#fPreset').value,rr=analyse(lt,findMRZ(lt),'paste');if(pr0&&CHECK_TYPES.test(pr0)&&!rr.calc){var tb2=parseCheckTable(lt);if(tb2){rr.preset=pr0;rr.issue=tb2.check;rr.expiry=tb2.valid;rr.conf='medium';rr.calc='Latest entry'+(tb2.rows>1?' of '+tb2.rows:'')+': checked '+fmt(tb2.check)+', valid until '+fmt(tb2.valid);rr.handwritten=false}}
      if(!rr.expiry){toast('No check date and validity pair found in the pasted text');break}if(pr0)rr.preset=pr0;applyDetection(rr);toast('Expiry set to '+fmt(rr.expiry));break;
+   case 'list-apply':applyList();break;
    case 'paste-scan':closeSheet();pasteSheet();break;
-   case 'paste-go':var pt=$('#pasteText').value;if(!pt.trim()){toast('Paste the copied text first');break}var pr=analyse(pt,findMRZ(pt),'paste');closeSheet();
+   case 'paste-go':var pt=$('#pasteText').value;if(!pt.trim()){toast('Paste the copied text first');break}var pr=analyse(pt,findMRZ(pt),'paste');closeSheet();if(pr.list){listSheet(pr.list);break}
      var po=SCAN_CTX&&SCAN_CTX.owner!=null?SCAN_CTX.owner:'';var phm=matchMember(pr);if(phm&&!(SCAN_CTX&&SCAN_CTX.fixed))po=phm;editor(null,{owner:po,detect:pr});break;
    case 'hw-apply':var hd=$('#hwDate').value;if(isNaN(isoN(hd))){toast('Enter the latest check date');break}$('#fIssue').value=hd;var hm=num($('#fValid').value,0);if(hm<=0){toast('Set the validity in months first');break}
      var he=computeExpiry(hd,hm,$('#fEom').checked,ED&&ED.orig,num($('#fWin').value,0));$('#fExp').value=he.iso;if(ED&&ED.det){ED.det.handwritten=false;ED.det.calc=fmt(hd)+' check, '+hm+' months'+($('#fEom').checked?' to end of month':'')+'. '+he.rule;ED.det.conf='medium'}renderDet();toast('Expiry set to '+fmt(he.iso));break;
