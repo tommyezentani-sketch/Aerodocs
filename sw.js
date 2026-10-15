@@ -1,5 +1,5 @@
-/* AeroDocs service worker v1.009 */
-const CACHE='aerodocs-v1.009';
+/* AeroDocs service worker v1.010 */
+const CACHE='aerodocs-v1.010';
 const LIB='aerodocs-lib-t5.1.1-p3.11.174';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});

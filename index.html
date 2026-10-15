@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.009 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.010 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -260,7 +260,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.009</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.010</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -426,7 +426,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.009', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.010', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -1093,8 +1093,12 @@ function parseExpiryList(text){
     var m=line.match(/^[^A-Z0-9]*([A-Z][A-Z0-9]{1,9})\b[^0-9A-Z]{0,24}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);if(!m)return;
     var ds=findDates(m[2],'');if(!ds.length||seen[m[1]])return;seen[m[1]]=1;out.push({code:m[1],iso:ds[0].iso});
   });
-  if(out.length<3){var codes=(T.match(/^[^A-Z0-9]*([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/gm)||[]).map(function(x){return x.replace(/[^A-Z0-9]/g,'')}),dates=findDates(text,'').sort(function(a,b){return a.idx-b.idx});
-    if(codes.length>=3&&codes.length===dates.length)out=codes.map(function(c,i){return {code:c,iso:dates[i].iso}})}
+  var dates=findDates(T,'').sort(function(a,b){return a.idx-b.idx});
+  if(out.length<3){var codes=(T.match(/^[^A-Z0-9]*([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/gm)||[]).map(function(x){return x.replace(/[^A-Z0-9]/g,'')}).filter(function(c){return LIST_MAP[c]||/^[A-Z]{2,6}\d?$/.test(c)});
+    if(codes.length>=3&&dates.length>=3&&Math.abs(codes.length-dates.length)<=1){var k=Math.min(codes.length,dates.length),o2=[];for(var i=0;i<k;i++)o2.push({code:codes[i],iso:dates[i].iso});if(o2.length>out.length)out=o2}}
+  if(out.length<3&&dates.length>=3){var o3=[],sn={};dates.forEach(function(d){var back=T.slice(Math.max(0,d.idx-60),d.idx),mm=back.match(/([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/);
+      if(mm&&!sn[mm[1]]&&!/^(DATE|VALID|UNTIL|EXPIRY|EXP)$/.test(mm[1])){sn[mm[1]]=1;o3.push({code:mm[1],iso:d.iso})}});
+    if(o3.length>out.length)out=o3}
   var known=out.filter(function(x){return LIST_MAP[x.code]}).length;
   return out.length>=3&&known>=2?out:null;
 }
@@ -1218,6 +1222,7 @@ function renderDet(){
   el.className='det '+r.conf;
   el.innerHTML='<div class="det-h"><span class="pill '+(r.conf==='high'?'ok':r.conf==='none'?'neutral':'warn')+'"><span class="dot"></span>'+esc(src)+'</span>Detected: '+esc(r.preset?pn:'Unknown type')+'</div><div>'+head+'</div>'+hw+chg+
    (r.cands.length?'<div class="lbl-t">Dates found — tap to set expiry</div><div class="dchips">'+r.cands.map(function(c){return '<button type="button" class="dchip" data-act="pick-date" data-iso="'+c.iso+'" aria-pressed="'+(c.iso===cur)+'">'+fmt(c.iso)+(c.label?'<small>'+esc({'expiry label':'labelled expiry','issue/birth label':'issue / birth','class 1':'Class 1'}[c.label]||c.label)+'</small>':'')+'</button>'}).join('')+'</div>':'')+
+   (r.cands.length>=3?'<button type="button" class="btn sm" data-act="as-list" style="align-self:flex-start">This is a list of several expiries</button>':'')+
    (r.text.trim()?'<details><summary>Recognised text</summary><pre>'+esc(r.text.slice(0,2500))+'</pre></details>':'');
 }
 function edProgress(label,p){var el=$('#detBox');if(!el)return;el.hidden=false;el.className='det none';
@@ -1234,7 +1239,9 @@ async function editorAddFiles(list){
   else if(first)toast('File attached. Tap it and choose Read to scan.');
 }
 async function editorScan(prep){
-  try{var r=await detectFrom(prep,edProgress);if(r.rotation){await applyRotation(prep.meta,r.rotation);renderEdFiles()}if(ED)applyDetection(r)}
+  try{var r=await detectFrom(prep,edProgress);
+    if(r.list){if(ED){var fid=prep.meta.id;ED.files=ED.files.filter(function(m){return m.id!==fid});var ai=ED.added.indexOf(fid);if(ai>-1){ED.added.splice(ai,1);FS.del(fid).catch(function(){})}}closeSheet();listSheet(r.list);return}
+    if(r.rotation){await applyRotation(prep.meta,r.rotation);renderEdFiles()}if(ED)applyDetection(r)}
   catch(e){if(ED){ED.det=null;renderDet()}toast(ocrErrMsg(e))}
 }
 
@@ -1440,6 +1447,9 @@ document.addEventListener('click',function(ev){
      var pr0=$('#fPreset').value,rr=analyse(lt,findMRZ(lt),'paste');if(pr0&&CHECK_TYPES.test(pr0)&&!rr.calc){var tb2=parseCheckTable(lt);if(tb2){rr.preset=pr0;rr.issue=tb2.check;rr.expiry=tb2.valid;rr.conf='medium';rr.calc='Latest entry'+(tb2.rows>1?' of '+tb2.rows:'')+': checked '+fmt(tb2.check)+', valid until '+fmt(tb2.valid);rr.handwritten=false}}
      if(!rr.expiry){toast('No check date and validity pair found in the pasted text');break}if(pr0)rr.preset=pr0;applyDetection(rr);toast('Expiry set to '+fmt(rr.expiry));break;
    case 'list-apply':applyList();break;
+   case 'as-list':if(ED&&ED.det){var tx=normDigits(ED.det.text).toUpperCase(),ds=findDates(tx,'').sort(function(a,b){return a.idx-b.idx}),rows=[],sn={};
+     ds.forEach(function(d,i){var back=tx.slice(Math.max(0,d.idx-60),d.idx),mm=back.match(/([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/),c=mm&&!/^(DATE|VALID|UNTIL|EXPIRY|EXP)$/.test(mm[1])?mm[1]:'ITEM'+(i+1);if(sn[c])return;sn[c]=1;rows.push({code:c,iso:d.iso})});
+     if(rows.length<2){toast('Not enough dated rows found');break}if(ED.isNew){ED.added.forEach(function(fid){FS.del(fid).catch(function(){})});ED.added=[]}ED.saved=true;closeSheet();listSheet(rows)}break;
    case 'check-update':checkUpdate(true);break;
    case 'do-update':doUpdate();break;
    case 'paste-scan':closeSheet();pasteSheet();break;
