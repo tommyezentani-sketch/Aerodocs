@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.011 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.012 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -263,7 +263,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.011</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.012</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -430,7 +430,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.011', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.012', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -1066,6 +1066,9 @@ function findDates(text,preset){
   re=/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[1],m[2],m[3]),m.index,m[0].length);
   re=/(^|\D)(\d{1,2})\s?[\/\-.]\s?(\d{1,2})\s?[\/\-.]\s?(\d{4}|\d{2})(?!\d)/g;
   while((m=re.exec(U))){var a=+m[2],b=+m[3],dd=a,mm=b;if(a<=12&&b>12){mm=a;dd=b}add(mkIso(m[4],mm,dd),m.index+m[1].length,m[0].length-m[1].length)}
+  re=/(^|\D)(\d{2})(\d{2})[\/\-.](\d{4})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[4],m[3],m[2]),m.index+m[1].length,m[0].length-m[1].length);
+  re=/(^|\D)(\d{2})[\/\-.](\d{2})(\d{4})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[4],m[3],m[2]),m.index+m[1].length,m[0].length-m[1].length);
+  re=/(^|\D)(\d{2})(\d{2})(20\d{2})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[4],m[3],m[2]),m.index+m[1].length,m[0].length-m[1].length);
   re=/(^|\D)(\d{2}) (\d{2}) (\d{4})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[4],m[3],m[2]),m.index+m[1].length,m[0].length-m[1].length);
   re=/(^|[^\dA-Z])(\d{1,2})[\s\-.\/]*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEPT|SEP|OCT|NOV|DEC)[A-Z]*\.?[\s\-.\/,]*(\d{4}|\d{2})(?!\d)/g;
   while((m=re.exec(U)))add(mkIso(m[4],MONMAP[m[3]],m[2]),m.index+m[1].length,m[0].length-m[1].length);
@@ -1160,7 +1163,9 @@ function analyse(text,mrz,method){
   var ds=findDates(text,r.preset);
   if(mrz&&mrz.expiry){ds=ds.filter(function(d){return d.iso!==mrz.expiry});ds.unshift({iso:mrz.expiry,n:isoN(mrz.expiry),label:'MRZ',score:99})}
   var seenC={};r.cands=ds.filter(function(d){if(seenC[d.iso])return false;seenC[d.iso]=1;return true}).slice(0,6);
-  if(!r.expiry&&ds.length){r.expiry=ds[0].iso;r.conf=ds[0].label==='expiry label'||ds[0].label==='class 1'?'medium':'low'}
+  if(!r.expiry&&ds.length){var top=ds[0];
+    if(top.label==='expiry label'||top.label==='class 1'){r.expiry=top.iso;r.conf='medium'}
+    else{var g=ds.filter(function(d){return !/issue|birth|passport|ELP/.test(d.label||'')&&d.n>=t})[0];if(g){r.expiry=g.iso;r.conf='low'}else{r.conf=r.text.trim()?'low':'none';r.noExpiry=true}}}
   if(!mrz){var iss=ds.filter(function(d){return d.label==='issue/birth label'&&d.n<=t&&d.n>t-365*11}).sort(function(a,b){return b.n-a.n})[0];if(iss)r.issue=iss.iso}
   if(r.preset&&!r.name){var p=presetBy(r.preset)||{};r.name=p.name||'';var ac=(String(text).match(AC_RE)||[])[0];
     if(ac&&/^(lpc|opc|line)$/.test(r.preset))r.name=ac.toUpperCase().replace(' ','')+' '+(r.preset==='lpc'?'Type Rating LPC':r.preset==='opc'?'OPC':'Line Check')}
@@ -1230,6 +1235,7 @@ function renderDet(){
   var head={high:'Read from the passport/ID machine-readable zone. Check digits verified.',medium:r.method==='mrz'?'Read from the machine-readable zone, but a check digit failed. Verify the date.':'Expiry found next to an expiry label. Verify before saving.',low:'No expiry label found. Best guess selected; tap the correct date below.',none:'No readable text found. Enter the details manually.'}[r.conf];
   var src={mrz:'MRZ',ocr:'Photo OCR','pdf-text':'PDF text',paste:'Live Text',none:'—'}[r.method]||r.method;
   if(r.calc)head=(/^Latest entry/.test(r.calc)?esc(r.calc)+'. Verify against the card.':'Calculated: '+esc(r.calc)+'. Check against the licence remarks.');
+  if(r.noExpiry&&!r.unsure&&!r.handwritten&&!r.calc)head='No expiry date could be read from this photo, so nothing was filled in. Tap the right date below, or retake the photo straight and close up.';
   if(r.unsure)head='Document type not recognised and no date is labelled as expiry, so nothing was filled in. Pick the type, then tap the correct date below or enter it.';
   if(r.handwritten)head='The entries look handwritten, so no date was guessed. Paste the text from iPhone Live Text below (it reads handwriting), or enter the latest check date.';
   var hw=r.handwritten?'<div class="field"><label for="ltText">Paste Live Text from the photo</label><textarea id="ltText" placeholder="Photos → open the image → Live Text icon → Select All → Copy, then paste here" style="min-height:70px"></textarea><div class="row"><button type="button" class="btn sm primary" data-act="lt-read">Read pasted text</button><span class="hint">The latest row is used.</span></div></div><div class="row" style="align-items:flex-end"><div class="field" style="flex:1 1 150px"><label for="hwDate">Latest check date</label><input id="hwDate" type="date"></div><button type="button" class="btn sm primary" data-act="hw-apply">Calculate expiry</button></div>':'';
