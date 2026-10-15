@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.010 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.011 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<style>:root{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
 <title>AeroDocs</title>
@@ -45,8 +45,11 @@
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
+html{height:100%;touch-action:manipulation}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(var(--tabbar) + 28px + env(safe-area-inset-bottom,0px))}
+  height:100%;margin:0;display:flex;flex-direction:column;overflow:hidden;padding:0}
+#scroller{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 28px}
 .wrap{max-width:760px;margin:0 auto}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -60,7 +63,7 @@ p{margin:0}
 a{color:var(--accent)}
 
 /* header */
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:12px 10px;border-bottom:1px solid var(--line)}
+.top{flex:none;position:relative;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(12px + var(--sat,0px)) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px))}
 .top-in{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand svg{flex:none}
@@ -71,7 +74,7 @@ a{color:var(--accent)}
 .icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer}
 .icon-btn svg{width:18px;height:18px}
 
-main{display:block;padding-top:16px}
+main{display:block}
 section[data-tab]{display:flex;flex-direction:column;gap:16px}
 
 /* annunciator */
@@ -166,7 +169,7 @@ tr:last-child td{border-bottom:0}
 input[type=text],input[type=email],input[type=date],input[type=number],input[type=url],input[type=password],input[type=time],select,textarea{
   width:100%;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:16px;appearance:none;-webkit-appearance:none}
 select{background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
-textarea{min-height:84px;resize:vertical}
+textarea{min-height:84px;resize:vertical;font-size:16px}
 input[type=date]{font-family:var(--f-mono)}
 .check{display:flex;align-items:center;gap:10px;font-size:.9rem;min-height:36px;cursor:pointer}
 .check input{width:20px;height:20px;accent-color:var(--accent);flex:none}
@@ -175,8 +178,8 @@ input[type=date]{font-family:var(--f-mono)}
 .calc .field{flex:1 1 120px}
 
 /* tabbar */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);
-  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.tabbar{flex:none;position:relative;z-index:30;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + var(--sab,0px)) max(8px,env(safe-area-inset-left,0px))}
 .tabbar-in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
 .tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;white-space:nowrap;border:0;background:none;border-radius:10px;cursor:pointer;color:var(--ink-2);font-size:.7rem;font-weight:500;min-height:50px}
 .tab svg{width:22px;height:22px}
@@ -260,7 +263,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.010</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.011</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -269,9 +272,10 @@ input[type=date]{font-family:var(--f-mono)}
   </div>
 </header>
 
-<main class="wrap">
+<main id="scroller"><div class="wrap">
   <section id="tab-docs" data-tab>
     <div id="updBanner" class="banner" hidden><span id="updText">A new version of AeroDocs is available.</span><button class="btn sm primary" data-act="do-update">Update now</button></div>
+    <div id="bkBanner" class="banner" hidden><span id="bkText"></span><button class="btn sm" data-act="export-json">Back up now</button></div>
     <div id="sampleBanner" class="banner" hidden>
       <span>Sample pilot data loaded. Replace with your own documents.</span>
       <button class="btn sm" data-act="remove-samples">Remove samples</button>
@@ -403,7 +407,7 @@ input[type=date]{font-family:var(--f-mono)}
     </div>
     <p class="foot" id="footVer"></p>
   </section>
-</main>
+</div></main>
 
 <nav class="tabbar" aria-label="Sections">
   <div class="tabbar-in" role="tablist">
@@ -426,7 +430,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.010', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.011', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -467,12 +471,20 @@ var DEF_EM={provider:'off',to:'',ejsService:'',ejsTemplate:'',ejsPublic:'',relay
 
 /* ---------- storage ---------- */
 var storageOK=true;
+var loadOK=true;
 function load(){
-  var d=null; try{d=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storageOK=false}
+  var d=null,raw=null;
+  try{raw=localStorage.getItem(KEY)}catch(e){storageOK=false;loadOK=false}
+  if(raw){try{d=JSON.parse(raw)}catch(e){d=null;loadOK=false;try{localStorage.setItem(KEY+'.unreadable-'+Date.now(),raw)}catch(x){}}}
+  if(!d||!Array.isArray(d.docs)||(!d.docs.length&&!raw)){try{var bk=JSON.parse(localStorage.getItem(KEY+'.bak')||'null');if(bk&&Array.isArray(bk.docs)&&bk.docs.length){d=bk;loadOK=true;setTimeout(function(){toast('Restored '+bk.docs.length+' documents from the safety copy')},800)}}catch(e){}}
+  if(raw&&!d)loadOK=false;
   d=d||{};
-  return {ver:VER,docs:Array.isArray(d.docs)?d.docs:[],family:Array.isArray(d.family)?d.family:[],settings:Object.assign({},DEF_SET,d.settings||{}),email:Object.assign({},DEF_EM,d.email||{}),sent:d.sent||{},log:Array.isArray(d.log)?d.log:[],lastAuto:d.lastAuto||0};
+  return {ver:VER,docs:Array.isArray(d.docs)?d.docs:[],family:Array.isArray(d.family)?d.family:[],settings:Object.assign({},DEF_SET,d.settings||{}),email:Object.assign({},DEF_EM,d.email||{}),sent:d.sent||{},log:Array.isArray(d.log)?d.log:[],lastAuto:d.lastAuto||0,lastBackup:d.lastBackup||0};
 }
-function save(){try{S.ver=VER;localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false;toast('Not saved: browser storage is unavailable here')}}
+function save(){
+  if(!loadOK&&!S.docs.length){toast('Not saved: existing data could not be read. Nothing was overwritten.');return}
+  try{S.ver=VER;var js=JSON.stringify(S);localStorage.setItem(KEY,js);if(S.docs.length)localStorage.setItem(KEY+'.bak',js);storageOK=true}
+  catch(e){storageOK=false;toast('Not saved: browser storage is unavailable here')}}
 var UI=(function(){try{return JSON.parse(localStorage.getItem(UIKEY)||'null')||{}}catch(e){return {}}})();
 UI.tab=UI.tab||'docs'; UI.filter=UI.filter||'all';
 function saveUI(){try{localStorage.setItem(UIKEY,JSON.stringify(UI))}catch(e){}}
@@ -675,6 +687,8 @@ function docCard(d){
 function renderDocs(){
   renderAnnun();renderRunway();renderFilters();
   $('#sampleBanner').hidden=!S.docs.some(function(d){return d.sample});
+  var bkAge=S.lastBackup?Math.floor((Date.now()-S.lastBackup)/864e5):null,bkDue=S.docs.filter(function(d){return !d.sample}).length>0&&(bkAge==null||bkAge>30);
+  $('#bkBanner').hidden=!bkDue;if(bkDue)$('#bkText').textContent=bkAge==null?'No backup yet. Save one to Files so your documents survive a phone change.':'Last backup '+bkAge+' days ago.';
   var list=sortedOf(mine()).filter(function(d){return passes(d,UI.filter)}),el=$('#docList');
   if(!mine().length){el.innerHTML='<div class="empty"><h3>No documents tracked</h3><p class="muted">Start with your Medical, LPC/OPC and passport, or load realistic pilot data to test.</p><div class="row" style="justify-content:center"><button class="btn primary" data-act="add">Add document</button><button class="btn" data-act="load-sample">Load pilot sample data</button></div></div>';return}
   if(!list.length){el.innerHTML='<div class="empty"><p class="muted">Nothing in this filter.</p></div>';return}
@@ -733,7 +747,7 @@ function showTab(t,silent){
   UI.tab=t;saveUI();
   $$('section[data-tab]').forEach(function(s){s.hidden=s.id!=='tab-'+t});
   $$('.tab').forEach(function(b){b.setAttribute('aria-selected',String(b.getAttribute('data-tab')===t))});
-  if(!silent)window.scrollTo(0,0);
+  if(!silent){var sc=$('#scroller');if(sc)sc.scrollTop=0}
 }
 
 /* ---------- calendar: Google ---------- */
@@ -808,7 +822,7 @@ function deliver(name,mime,text){
 function textSheet(name,text){
   openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">'+esc(name)+'</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
    '<p class="note" style="margin-bottom:10px">'+(inFrame?'Downloads are blocked inside the Claude preview. Copy the content below and save it as <span class="mono">'+esc(name)+'</span>, or run the hosted copy where this button downloads directly.':'Copy the content below and save it as <span class="mono">'+esc(name)+'</span>.')+'</p>'+
-   '<textarea id="txtOut" readonly style="min-height:220px;font-family:var(--f-mono);font-size:12px">'+esc(text)+'</textarea>'+
+   '<textarea id="txtOut" readonly style="min-height:220px;font-family:var(--f-mono);font-size:16px">'+esc(text)+'</textarea>'+
    '<div class="sheet-f"><button class="btn primary" data-act="copy-out">Copy</button><button class="btn" data-act="close">Done</button></div>');
 }
 
@@ -881,7 +895,7 @@ function editor(id,opt){
     if(ex&&ex.expiry&&ex.expiry!==exp){rec.history=(ex.history||[]).concat([{expiry:ex.expiry,replaced:nIso(todayN())}]).slice(-10)}
     ED.removed.forEach(function(fid){FS.del(fid).catch(function(){})});
     if(isNew){S.docs.push(rec)}else{rec.sample=false;var ix=S.docs.findIndex(function(x){return x.id===ex.id});S.docs[ix]=rec}
-    ED.saved=true;save();closeSheet();renderAll();toast(isNew?'Added '+docLabel(rec):'Saved '+docLabel(rec));
+    ED.saved=true;save();commitFiles(rec.files);closeSheet();renderAll();toast(isNew?'Added '+docLabel(rec):'Saved '+docLabel(rec));
   });
 }
 function renderEdFiles(){
@@ -908,7 +922,7 @@ function askPersist(){if(persistAsked)return;persistAsked=true;try{if(navigator.
 async function getBlob(id){var r=await FS.get(id);return r?new Blob([r.buf],{type:r.type}):null}
 async function storeFile(prep,meta,docId){
   var buf=await prep.blob.arrayBuffer();
-  await FS.put({id:meta.id,docId:docId,name:meta.name,type:meta.type,size:meta.size,created:meta.created,buf:buf});
+  await FS.put({id:meta.id,docId:docId,name:meta.name,type:meta.type,size:meta.size,created:meta.created,buf:buf,temp:true});
   askPersist();return meta;
 }
 async function applyRotation(meta,deg){
@@ -918,6 +932,7 @@ async function applyRotation(meta,deg){
     meta.size=jb.size;meta.thumb=drawScaled(c,240,240).toDataURL('image/jpeg',0.62);meta.rotated=(meta.rotated||0)+deg;
   }catch(e){}
 }
+async function commitFiles(list){for(var i=0;i<(list||[]).length;i++){try{var r=await FS.get(list[i].id);if(r&&r.temp){delete r.temp;await FS.put(r)}}catch(e){}}}
 async function rekey(ids,docId){for(var i=0;i<ids.length;i++){var r=await FS.get(ids[i]);if(r){r.docId=docId;await FS.put(r)}}}
 
 /* ---------- libraries (self-hosted in the bundle; CDN only inside the Claude preview) ---------- */
@@ -1257,7 +1272,7 @@ function scanSheet(){
 function pasteSheet(){
   openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Paste Live Text</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
    '<ol class="steps"><li>Open the photo in Photos (or point the Camera at the card).</li><li>Tap the Live Text icon, then Select All → Copy.</li><li>Paste below. For check records the latest row is used.</li></ol>'+
-   '<textarea id="pasteText" style="min-height:180px;margin-top:10px;font-family:var(--f-mono);font-size:14px" placeholder="A320 P1 13.08.26 30.09.27"></textarea>'+
+   '<textarea id="pasteText" style="min-height:180px;margin-top:10px;font-family:var(--f-mono);font-size:16px" placeholder="A320 P1 13.08.26 30.09.27"></textarea>'+
    '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="paste-go">Read text</button></div>');
 }
 function progSheet(){
@@ -1341,7 +1356,7 @@ function exportSheet(){
     try{var data={app:'AeroDocs',ver:VER,exported:new Date().toISOString(),docs:S.docs,family:S.family,settings:S.settings,email:Object.assign({},S.email,{relayToken:''})};
       if(wf){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});var all=await FS.all();
         data.files=all.filter(function(r){return keep[r.id]}).map(function(r){return {id:r.id,docId:r.docId,name:r.name,type:r.type,size:r.size,created:r.created,b64:bufToB64(r.buf)}})}
-      closeSheet();deliver('aerodocs-backup-'+compact(todayN())+(wf?'-with-files':'')+'.json','application/json',JSON.stringify(data,null,wf?0:2));
+      S.lastBackup=Date.now();save();closeSheet();renderAll();deliver('aerodocs-backup-'+compact(todayN())+(wf?'-with-files':'')+'.json','application/json',JSON.stringify(data,null,wf?0:2));
     }catch(e){this.disabled=false;toast('Export failed: '+(e.message||e))}};
 }
 
@@ -1465,7 +1480,7 @@ document.addEventListener('click',function(ev){
       S.docs.filter(function(x){return x.sample||gone[x.owner]}).forEach(function(d){(d.files||[]).forEach(function(f){FS.del(f.id).catch(function(){})})});S.docs=S.docs.filter(function(x){return !x.sample&&!gone[x.owner]});S.family=S.family.filter(function(m){return !gone[m.id]});save();renderAll();toast('Samples removed')});break;
    case 'export-json':exportSheet();break;
    case 'import-json':$('#importFile').click();break;
-   case 'clear-all':confirmSheet('Clear all data','Deletes every document, attached file, setting and email log stored on this device. Export a backup first if you need it.','Clear everything',true,function(){S={ver:VER,docs:[],family:[],settings:Object.assign({},DEF_SET),email:Object.assign({},DEF_EM),sent:{},log:[],lastAuto:0};save();FS.clear().catch(function(){});renderAll();toast('All data cleared')});break;
+   case 'clear-all':confirmSheet('Clear all data','Deletes every document, attached file, setting and email log stored on this device. Export a backup first if you need it.','Clear everything',true,function(){S={ver:VER,docs:[],family:[],settings:Object.assign({},DEF_SET),email:Object.assign({},DEF_EM),sent:{},log:[],lastAuto:0};try{localStorage.removeItem(KEY+'.bak')}catch(e){}save();FS.clear().catch(function(){});renderAll();toast('All data cleared')});break;
    case 'email-test':var m=emailCfgOK();if(m){toast(m);break}b.disabled=true;sendEmail('AeroDocs test email','Test from AeroDocs v'+VER+' on '+fmt(todayN())+'. Alerts are configured correctly.').then(function(){logIt('Test email sent to '+S.email.to);toast('Test email sent')}).catch(function(err){logIt('Test failed: '+(err&&err.message||err));toast(inFrame?'Blocked in Claude preview. Use the hosted copy.':'Test failed. See log.')}).then(function(){b.disabled=false;renderEmail()});break;
    case 'email-check':b.disabled=true;runCheck(true).then(function(){b.disabled=false});break;
    case 'copy-out':var ta=$('#txtOut');var done=function(){toast('Copied')};if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(done).catch(function(){ta.focus();ta.select();toast('Select all and copy')})}else{ta.focus();ta.select();toast('Select all and copy')}break;
@@ -1517,7 +1532,7 @@ function checkUpdate(manual){
   return fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){
     if(!j||!j.version)return;latestVer=j.version;
     var newer=j.version!==VER&&j.version.localeCompare(VER,undefined,{numeric:true})>0;
-    $('#updBanner').hidden=!newer;if(newer)$('#updText').textContent='AeroDocs v'+j.version+' is available (you have v'+VER+').';
+    $('#updBanner').hidden=!newer;if(newer)$('#updText').textContent='AeroDocs v'+j.version+' is available (you have v'+VER+'). Your documents and files stay on this device.';
     if(manual)$('#updState').textContent=newer?'v'+j.version+' available':'Up to date (v'+VER+')';
   }).catch(function(){if(manual)$('#updState').textContent='Could not reach the server'});
 }
@@ -1535,8 +1550,9 @@ if(!inFrame&&'serviceWorker' in navigator&&(location.protocol==='https:'||locati
 renderAll();
 autoCheck();
 checkUpdate(false);
-setTimeout(function(){FS.all().then(function(all){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});
-  (all||[]).forEach(function(r){if(!keep[r.id]&&Date.now()-Date.parse(r.created||0)>3600e3)FS.del(r.id)})}).catch(function(){})},4000);
+setTimeout(function(){if(!loadOK||!storageOK||!S.docs.length)return;FS.all().then(function(all){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});
+  (all||[]).forEach(function(r){if(r.temp&&!keep[r.id]&&Date.now()-Date.parse(r.created||0)>6*3600e3)FS.del(r.id)})}).catch(function(){})},8000);
+if(!inFrame)askPersist();
 })();
 </script>
 
