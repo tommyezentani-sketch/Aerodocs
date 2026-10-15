@@ -1,0 +1,1394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AeroDocs">
+<meta name="theme-color" content="#edf1f5">
+<meta name="description" content="AeroDocs v1.005 — pilot document expiry tracker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<title>AeroDocs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: single-column instrument stack — GO/NO-GO annunciator, 12-month runway, document strips; fixed bottom tab bar; 760px max centred on wide screens */
+:root{
+  --bg:#edf1f5; --surface:#ffffff; --surface-2:#e5eaf0; --ink:#0f1b2a; --ink-2:#4a5a6c; --line:#d2dae3;
+  --accent:#0a6a88; --accent-ink:#ffffff; --accent-soft:#d6ecf3;
+  --ok:#11764f; --ok-bg:#daf0e5; --warn:#8a5700; --warn-bg:#fbebc9; --bad:#b0222b; --bad-bg:#f9dedf;
+  --shadow:0 1px 2px rgba(15,27,42,.05),0 8px 24px rgba(15,27,42,.06);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:12px; --tabbar:62px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1420; --surface:#111d2b; --surface-2:#182637; --ink:#e5ecf3; --ink-2:#91a3b6; --line:#24354a;
+  --accent:#3fc6e6; --accent-ink:#04202c; --accent-soft:#0f3342;
+  --ok:#41d68a; --ok-bg:#0f2d22; --warn:#ffb224; --warn-bg:#33270c; --bad:#ff5d63; --bad-bg:#3a1418;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1420; --surface:#111d2b; --surface-2:#182637; --ink:#e5ecf3; --ink-2:#91a3b6; --line:#24354a;
+  --accent:#3fc6e6; --accent-ink:#04202c; --accent-soft:#0f3342;
+  --ok:#41d68a; --ok-bg:#0f2d22; --warn:#ffb224; --warn-bg:#33270c; --bad:#ff5d63; --bad-bg:#3a1418;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(var(--tabbar) + 28px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:760px;margin:0 auto}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.02em;margin:0;text-wrap:balance}
+h2{font-size:1.5rem}
+h3{font-size:1.15rem;letter-spacing:.03em}
+p{margin:0}
+.muted{color:var(--ink-2)}
+.eyebrow{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+a{color:var(--accent)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:12px 10px;border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{flex:none}
+.wordmark{font-family:var(--f-display);font-weight:700;font-size:1.45rem;letter-spacing:.16em;line-height:1}
+.brand .sub{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;margin-top:3px}
+.top-r{display:flex;align-items:center;gap:8px}
+.today{font-size:.78rem;color:var(--ink-2);padding:4px 8px;border:1px solid var(--line);border-radius:6px;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer}
+.icon-btn svg{width:18px;height:18px}
+
+main{display:block;padding-top:16px}
+section[data-tab]{display:flex;flex-direction:column;gap:16px}
+
+/* annunciator */
+.annun{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:center;padding:16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.annun .lamp{grid-row:span 2;font-family:var(--f-display);font-weight:700;font-size:2rem;letter-spacing:.1em;padding:6px 14px;border-radius:8px;border:2px solid currentColor;line-height:1.05;text-align:center;min-width:96px}
+.annun.ok .lamp{color:var(--ok);background:var(--ok-bg)}
+.annun.warn .lamp{color:var(--warn);background:var(--warn-bg)}
+.annun.bad .lamp{color:var(--bad);background:var(--bad-bg)}
+.annun .head{font-weight:600}
+.annun .counts{display:flex;flex-wrap:wrap;gap:6px;grid-column:1 / -1;margin-top:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;padding:3px 9px;border-radius:999px;font-weight:600;text-transform:uppercase;white-space:nowrap}
+.pill.ok{color:var(--ok);background:var(--ok-bg)} .pill.warn{color:var(--warn);background:var(--warn-bg)} .pill.bad{color:var(--bad);background:var(--bad-bg)}
+.pill.neutral{color:var(--ink-2);background:var(--surface-2)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* runway */
+.runway{padding:14px 16px 12px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.rw-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.rw-track{position:relative;height:var(--rw-h,36px);border-radius:6px;background:linear-gradient(90deg,var(--bad-bg) 0,var(--bad-bg) 2px,transparent 2px),var(--surface-2)}
+.rw-tick{position:absolute;top:0;bottom:0;border-left:1px dashed var(--line)}
+.rw-mark{position:absolute;width:12px;height:12px;margin-left:-6px;border-radius:50%;border:2px solid var(--surface);cursor:pointer;padding:0}
+.rw-mark.ok{background:var(--ok)} .rw-mark.warn{background:var(--warn)} .rw-mark.bad{background:var(--bad)}
+.rw-labels{position:relative;height:16px;margin-top:4px}
+.rw-labels span{position:absolute;transform:translateX(-50%);font-family:var(--f-mono);font-size:.62rem;color:var(--ink-2);letter-spacing:.05em}
+.rw-labels span:first-child{transform:none}
+
+/* sample banner */
+.banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:var(--accent-soft);color:var(--ink);font-size:.88rem}
+
+/* filters */
+.docs-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:.82rem;cursor:pointer;min-height:34px;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip .n{font-family:var(--f-mono);font-size:.72rem;opacity:.75}
+
+/* doc strips */
+.list{display:flex;flex-direction:column;gap:10px}
+.group-h{display:flex;align-items:center;gap:10px;margin-top:6px}
+.group-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.doc{position:relative;display:grid;grid-template-columns:1fr auto;gap:10px 14px;padding:14px 14px 12px 18px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.doc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--ok)}
+.doc.warn::before{background:var(--warn)} .doc.bad::before{background:var(--bad)}
+.doc.bad{border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.doc-main{min-width:0}
+.doc-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.tag{font-family:var(--f-mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;padding:2px 6px;border-radius:4px;background:var(--surface-2);color:var(--ink-2);text-transform:uppercase}
+.tag.code{background:var(--ink);color:var(--bg)}
+.tag.crit{color:var(--accent);background:var(--accent-soft)}
+.doc-name{font-weight:600;font-size:1.02rem;line-height:1.3;overflow-wrap:anywhere}
+.doc-sub{font-size:.82rem;color:var(--ink-2);overflow-wrap:anywhere}
+.doc-days{text-align:right;min-width:72px}
+.doc-days .big{font-family:var(--f-display);font-weight:700;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.doc.ok .big{color:var(--ink)} .doc.warn .big{color:var(--warn)} .doc.bad .big{color:var(--bad)}
+.doc-days .lbl{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase}
+.doc-meta{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.8rem;color:var(--ink-2)}
+.doc-meta b{font-family:var(--f-mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.doc-actions{grid-column:1 / -1;display:flex;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:.86rem;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn svg{width:16px;height:16px;flex:none}
+.btn:hover{border-color:var(--ink-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.btn.danger.solid{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn.sm{min-height:36px;padding:6px 11px;font-size:.8rem}
+.btn.grow{flex:1 1 0}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* panels */
+.panel{padding:16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.panel > p{max-width:65ch}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.steps{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;max-width:65ch;font-size:.9rem}
+.note{font-size:.8rem;color:var(--ink-2);max-width:65ch}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.86rem}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;font-family:var(--f-mono)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.82rem}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-weight:500;background:var(--surface-2)}
+td.mono{font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+
+/* forms */
+.form{display:flex;flex-direction:column;gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label,.lbl-t{font-size:.75rem;font-weight:600;letter-spacing:.04em;color:var(--ink-2)}
+.field .hint{font-size:.74rem;color:var(--ink-2)}
+input[type=text],input[type=email],input[type=date],input[type=number],input[type=url],input[type=password],input[type=time],select,textarea{
+  width:100%;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:16px;appearance:none;-webkit-appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+textarea{min-height:84px;resize:vertical}
+input[type=date]{font-family:var(--f-mono)}
+.check{display:flex;align-items:center;gap:10px;font-size:.9rem;min-height:36px;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.checks{display:flex;flex-wrap:wrap;gap:4px 18px}
+.calc{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:10px;border-radius:10px;background:var(--surface-2)}
+.calc .field{flex:1 1 120px}
+
+/* tabbar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.tabbar-in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;white-space:nowrap;border:0;background:none;border-radius:10px;cursor:pointer;color:var(--ink-2);font-size:.7rem;font-weight:500;min-height:50px}
+.tab svg{width:22px;height:22px}
+.tab[aria-selected="true"]{color:var(--accent);background:var(--accent-soft)}
+.tab .badge{position:absolute;top:2px;right:calc(50% - 22px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font-size:.66rem;font-family:var(--f-mono);display:grid;place-items:center}
+
+/* sheet */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(5,12,20,.55);display:flex;align-items:flex-end;justify-content:center;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+.sheet{width:100%;max-width:620px;max-height:92%;overflow:auto;background:var(--surface);border-radius:18px 18px 0 0;padding:18px max(16px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px));box-shadow:var(--shadow);overscroll-behavior:contain}
+@media (min-width:700px){.scrim{align-items:center}.sheet{border-radius:16px;padding-bottom:18px}}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+.sheet-f{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end}
+.grabber{width:40px;height:5px;border-radius:3px;background:var(--line);margin:-6px auto 12px}
+@media (min-width:700px){.grabber{display:none}}
+.inline-confirm{padding:12px;border-radius:10px;background:var(--bad-bg);display:flex;flex-direction:column;gap:10px}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 22px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.86rem;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
+.empty{padding:28px 18px;text-align:center;border:1px dashed var(--line);border-radius:var(--r);display:flex;flex-direction:column;gap:12px;align-items:center}
+.log{display:flex;flex-direction:column;gap:6px;font-size:.8rem}
+.log div{padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.foot{font-family:var(--f-mono);font-size:.7rem;color:var(--ink-2);text-align:center;letter-spacing:.06em}
+.gcal-list{display:flex;flex-direction:column;gap:8px}
+.gcal-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.gcal-item .nm{font-weight:600;font-size:.9rem;min-width:0;overflow-wrap:anywhere}
+/* family */
+.fam-sum{display:flex;flex-direction:column;gap:8px}
+.member{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:var(--r);border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 55%,var(--bg))}
+.member-h{display:flex;align-items:center;gap:12px}
+.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.04em;background:var(--accent-soft);color:var(--accent)}
+.m-name{font-weight:600;font-size:1.05rem;overflow-wrap:anywhere}
+.member .doc{background:var(--surface)}
+.tab{font-size:.66rem}
+/* scan + files */
+.scan-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-block:14px}
+.btn.big{min-height:64px;flex-direction:column;gap:4px;font-size:.9rem;white-space:normal;text-align:center}
+.btn.big svg{width:22px;height:22px}
+.tips{margin:0;padding-left:1.1em;font-size:.84rem;color:var(--ink-2);display:flex;flex-direction:column;gap:4px;max-width:65ch}
+.scan-prog{display:flex;gap:14px;align-items:center}
+.scan-prog img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none}
+.bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+.bar span{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.det{padding:12px;border-radius:10px;border:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:.86rem}
+.det.high{background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.det.medium,.det.low{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.det.none{background:var(--surface-2)}
+.det .det-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:600}
+.det details{font-size:.78rem}
+.det summary{cursor:pointer;color:var(--ink-2)}
+.det pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--f-mono);font-size:.72rem;max-height:180px;overflow:auto;margin:6px 0 0;padding:8px;border-radius:6px;background:var(--surface)}
+.dchips{display:flex;flex-wrap:wrap;gap:6px}
+.dchip{font-family:var(--f-mono);font-size:.76rem;padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:var(--surface);cursor:pointer;min-height:32px}
+.dchip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.dchip small{font-family:var(--f-body);color:inherit;opacity:.7;margin-left:4px}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.fthumb{position:relative;aspect-ratio:3/4;max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);overflow:hidden;cursor:pointer;padding:0;display:flex;flex-direction:column;align-items:stretch}
+.fthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.fthumb .ph{flex:1;display:grid;place-items:center;font-family:var(--f-mono);font-size:.8rem;color:var(--ink-2)}
+.fthumb .fn{position:absolute;left:0;right:0;bottom:0;padding:3px 5px;font-size:.62rem;background:color-mix(in srgb,var(--surface) 88%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.fthumb .ty{position:absolute;top:4px;left:4px;font-family:var(--f-mono);font-size:.58rem;font-weight:600;padding:1px 4px;border-radius:3px;background:var(--ink);color:var(--bg)}
+.fadd{aspect-ratio:3/4;border:1px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:.72rem;color:var(--ink-2);cursor:pointer;text-align:center;padding:6px}
+.fadd svg{width:20px;height:20px}
+.scrim2{z-index:70;background:rgba(5,12,20,.72)}
+.viewer{max-width:760px}
+.vw-stage{display:grid;place-items:center;background:var(--surface-2);border-radius:10px;min-height:200px;overflow:auto;max-height:62vh}
+.vw-stage img,.vw-stage canvas{max-width:100%;height:auto;display:block}
+.hist{font-size:.78rem;color:var(--ink-2)}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}.annun .lamp{font-size:1.6rem;min-width:84px}.doc-days .big{font-size:1.9rem}.today{display:none}}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.005</span></div></div>
+    </div>
+    <div class="top-r">
+      <span class="today mono" id="todayLbl"></span>
+      <button class="icon-btn" id="themeBtn" data-act="theme" aria-label="Change theme" title="Theme"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="tab-docs" data-tab>
+    <div id="sampleBanner" class="banner" hidden>
+      <span>Sample pilot data loaded. Replace with your own documents.</span>
+      <button class="btn sm" data-act="remove-samples">Remove samples</button>
+    </div>
+    <div id="annun" class="annun ok"></div>
+    <div id="runway" class="runway"></div>
+    <div class="docs-head">
+      <div class="chips" id="filters" role="group" aria-label="Filter documents"></div>
+      <div class="row">
+        <button class="btn primary" data-act="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg>Scan</button>
+        <button class="btn" data-act="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+      </div>
+    </div>
+    <div id="docList" class="list"></div>
+  </section>
+
+  <section id="tab-family" data-tab hidden>
+    <div id="sampleBanner2" class="banner" hidden><span>Sample family data loaded. Replace with your family's documents.</span><button class="btn sm" data-act="remove-samples">Remove samples</button></div>
+    <div class="docs-head"><div><div class="eyebrow">Family</div><h2>Passports, visas &amp; residence</h2></div>
+      <div class="row"><button class="btn primary" data-act="scan-fam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg>Scan</button><button class="btn" data-act="add-member">+ Member</button></div></div>
+    <div id="famSummary" class="panel"></div>
+    <div class="chips" id="famFilters" role="group" aria-label="Filter by family member"></div>
+    <div id="famList" class="list" style="gap:18px"></div>
+  </section>
+
+  <section id="tab-sync" data-tab hidden>
+    <div><div class="eyebrow">Calendar sync</div><h2>Push expiries into your calendars</h2></div>
+    <div class="panel">
+      <h3>Apple Calendar · master .ics</h3>
+      <p class="muted">One file with every document. Each expiry carries built-in alarms (<span id="leadsTxt"></span>) at <span id="alarmTimeTxt"></span>, plus a renewal-action event on each document's threshold date.</p>
+      <div class="row"><button class="btn primary" data-act="bulk-ics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Bulk sync all expiries (.ics)</button><button class="btn" data-act="ics-mine">My documents only</button><button class="btn" data-act="ics-family">Family only</button></div><span class="note" id="bulkCount"></span>
+    </div>
+    <div class="panel">
+      <h3>Google Calendar · one-tap links</h3>
+      <p class="muted">Google's add-event link creates one event per tap. Each link below opens a pre-filled all-day event on the renewal date. For everything in one go, import the master .ics at calendar.google.com → Settings → Import &amp; export.</p>
+      <div class="gcal-list" id="gcalList"></div>
+    </div>
+    <div class="panel">
+      <h3>Reminder schedule</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>Document</th><th>Window opens</th><th>Renew by</th><th>Expires</th><th>Days</th></tr></thead><tbody id="schedBody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="tab-alerts" data-tab hidden>
+    <div><div class="eyebrow">Email alerts</div><h2>Direct email notifications</h2></div>
+    <div class="panel">
+      <p class="muted">Checks run each time AeroDocs opens (and on manual check). One digest email is sent per milestone crossed; each milestone is sent once per document expiry date.</p>
+      <div class="form" id="emailForm">
+        <div class="grid2">
+          <div class="field"><label for="emProvider">Provider</label>
+            <select id="emProvider"><option value="off">Off</option><option value="emailjs">EmailJS (direct from browser)</option><option value="resend">Resend (via your relay endpoint)</option></select></div>
+          <div class="field"><label for="emTo">Send alerts to</label><input id="emTo" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        </div>
+        <div id="ejsBox" class="form" hidden>
+          <div class="grid2">
+            <div class="field"><label for="ejsService">EmailJS Service ID</label><input id="ejsService" type="text" placeholder="service_xxxxxxx" autocomplete="off"></div>
+            <div class="field"><label for="ejsTemplate">EmailJS Template ID</label><input id="ejsTemplate" type="text" placeholder="template_xxxxxxx" autocomplete="off"></div>
+          </div>
+          <div class="field"><label for="ejsPublic">EmailJS Public Key</label><input id="ejsPublic" type="text" placeholder="Account → API keys → Public Key" autocomplete="off"></div>
+          <p class="note">In the EmailJS template set To&nbsp;Email to <span class="mono">{{to_email}}</span>, Subject to <span class="mono">{{subject}}</span>, body to <span class="mono">{{message}}</span>. Restrict the template to your own address in the EmailJS dashboard.</p>
+        </div>
+        <div id="resendBox" class="form" hidden>
+          <div class="field"><label for="relayUrl">Relay URL</label><input id="relayUrl" type="url" placeholder="https://your-domain/aerodocs/resend-relay.php" autocomplete="off"></div>
+          <div class="field"><label for="relayToken">Relay token</label><input id="relayToken" type="password" placeholder="Shared secret set in resend-relay.php" autocomplete="off"></div>
+          <p class="note">Resend blocks direct browser calls and the API key must never sit in client code. Upload the included <span class="mono">resend-relay.php</span> to your hosting; it holds the key server-side.</p>
+        </div>
+        <div class="field"><span class="lbl-t">Email milestones (days before expiry)</span>
+          <div class="checks" id="msChecks"></div>
+          <label class="check"><input type="checkbox" id="emExpired"> Also alert once when a document has expired</label>
+          <label class="check"><input type="checkbox" id="emAuto"> Run automatically when the app opens</label>
+        </div>
+        <div class="row">
+          <button class="btn" data-act="email-test">Send test email</button>
+          <button class="btn primary" data-act="email-check">Run check now</button>
+        </div>
+        <p class="note" id="emStatus"></p>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Sent log</h3>
+      <div class="log" id="emLog"></div>
+    </div>
+  </section>
+
+  <section id="tab-data" data-tab hidden>
+    <div><div class="eyebrow">Settings &amp; data</div><h2>Defaults, backup, install</h2></div>
+    <div class="panel">
+      <h3>Alert defaults</h3>
+      <div class="grid2">
+        <div class="field"><label for="setThr">Default alert threshold (days)</label><input id="setThr" type="number" min="0" max="730" inputmode="numeric"><span class="hint">Used for custom documents. Presets carry their own.</span></div>
+        <div class="field"><label for="setTime">Alarm time</label><input id="setTime" type="time"></div>
+      </div>
+      <div class="field"><span class="lbl-t">Extra calendar alarms on every expiry (days before)</span><div class="checks" id="leadChecks"></div></div>
+      <label class="check"><input type="checkbox" id="setRenew"> Add a "RENEW" action event on each threshold date</label>
+      <label class="check"><input type="checkbox" id="setWindow"> Add a "WINDOW OPENS" event where a revalidation window is set</label>
+      <label class="check"><input type="checkbox" id="setAudio"> Add audible alarm at the threshold (Apple .ics)</label>
+      <label class="check"><input type="checkbox" id="setRef"> Include reference numbers in calendar events</label>
+      <p class="note">Calendars sync to iCloud and Google servers. Reference numbers stay off events unless you tick the box above.</p>
+    </div>
+    <div class="panel">
+      <h3>Scanning &amp; files</h3>
+      <p class="muted">Text recognition runs on this device. The OCR engine and language data are served with the app and cached for offline use. Document images and PDFs never leave the phone.</p>
+      <label class="check"><input type="checkbox" id="setArabic"> Also read Arabic text (slower; useful for Arabic-only licences and Mulkiya)</label>
+      <div class="row"><button class="btn" data-act="ocr-warm">Prepare offline scanning</button><span class="note" id="ocrState"></span></div>
+      <dl class="kv"><dt>Files attached</dt><dd id="filesTxt">—</dd><dt>Storage used</dt><dd id="quotaTxt">—</dd></dl>
+    </div>
+    <div class="panel">
+      <h3>Data</h3>
+      <p class="muted">Records live in local storage and attached files in IndexedDB, on this device only. Export a backup before changing phones or clearing Safari data.</p>
+      <div class="row">
+        <button class="btn primary" data-act="load-sample">Load sample data</button>
+        <button class="btn" data-act="export-json">Export backup (.json)</button>
+        <button class="btn" data-act="import-json">Import backup</button>
+        <button class="btn danger" data-act="clear-all">Clear all data</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <p class="note" id="storageNote"></p>
+    </div>
+    <div class="panel">
+      <h3>Install on iPhone</h3>
+      <dl class="kv"><dt>Mode</dt><dd id="modeTxt"></dd><dt>Offline cache</dt><dd id="swTxt"></dd></dl>
+      <ol class="steps">
+        <li>Open the hosted AeroDocs URL in <b>Safari</b> (HTTPS).</li>
+        <li>Tap <b>Share</b> → <b>Add to Home Screen</b> → name it AeroDocs → <b>Add</b>.</li>
+        <li>Launch from the Home Screen icon. It opens full-screen and works offline.</li>
+      </ol>
+      <p class="note">Home Screen apps keep their own storage, separate from Safari. Load your data inside the installed app, or import a backup there.</p>
+    </div>
+    <p class="foot" id="footVer"></p>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Sections">
+  <div class="tabbar-in" role="tablist">
+    <button class="tab" role="tab" data-act="tab" data-tab="docs" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8.5 11h7M8.5 14.5h5" stroke-linecap="round"/></svg>My docs<span class="badge" id="docBadge" hidden></span></button>
+    <button class="tab" role="tab" data-act="tab" data-tab="family" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9.5" r="2.3"/><path d="M15.5 14.8c.5-.2 1-.3 1.5-.3 2.3 0 4 1.7 4 4.3"/></svg>Family<span class="badge" id="famBadge" hidden></span></button>
+    <button class="tab" role="tab" data-act="tab" data-tab="sync" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Calendar</button>
+    <button class="tab" role="tab" data-act="tab" data-tab="alerts" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>Email</button>
+    <button class="tab" role="tab" data-act="tab" data-tab="data" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+  </div>
+</nav>
+
+<input type="file" id="scanCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="scanPick" accept="image/*,application/pdf" hidden>
+<input type="file" id="edCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="edFile" accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.heic" multiple hidden>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
+<div class="scrim scrim2" id="scrim2" hidden><div class="sheet viewer" id="sheet2" role="dialog" aria-modal="true" aria-label="File viewer"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function(){
+'use strict';
+var VER='1.005', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
+var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+var $=function(s){return document.querySelector(s)};
+var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+
+/* ---------- presets (validity in months, eom = valid to end of month, window = revalidation window days) ---------- */
+var PRESETS=[
+ {k:'med1',g:'Aviation',name:'Medical Class 1',code:'MED',auth:'Aviation Medical Examiner',valid:12,eom:false,thr:45,win:45,crit:true,hint:'Revalidation exam up to 45 days before expiry keeps the original expiry date.'},
+ {k:'lic',g:'Aviation',name:'Pilot Licence (ATPL/CPL)',code:'LIC',auth:'CAA',valid:0,eom:false,thr:90,win:0,crit:true},
+ {k:'lpc',g:'Aviation',name:'Type Rating LPC',code:'LPC',auth:'Operator / TRE',valid:12,eom:true,thr:60,win:90,crit:true,hint:'Revalidation in the last 3 months of validity runs the new period from the current expiry.'},
+ {k:'opc',g:'Aviation',name:'Operator Proficiency Check (OPC)',code:'OPC',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:true},
+ {k:'line',g:'Aviation',name:'Line Check',code:'LC',auth:'Operator / LTC',valid:12,eom:true,thr:45,win:90,crit:true},
+ {k:'crm',g:'Aviation',name:'CRM Recurrent',code:'CRM',auth:'Operator',valid:12,eom:true,thr:30,win:0,crit:true},
+ {k:'sep',g:'Aviation',name:'SEP / Emergency Procedures',code:'SEP',auth:'Operator',valid:12,eom:true,thr:30,win:90,crit:true},
+ {k:'dg',g:'Aviation',name:'Dangerous Goods',code:'DG',auth:'Operator',valid:24,eom:true,thr:30,win:90,crit:true},
+ {k:'elp',g:'Aviation',name:'Language Proficiency (ELP)',code:'ELP',auth:'CAA',valid:48,eom:false,thr:90,win:0,crit:true},
+ {k:'ppt',g:'Aviation',name:'Passport',code:'PPT',auth:'',valid:120,eom:false,thr:180,win:0,crit:true,hint:'Many states refuse entry with less than 6 months validity. Threshold set to 180 days.'},
+ {k:'visa',g:'Aviation',name:'Visa / Residence Permit',code:'VISA',auth:'',valid:0,eom:false,thr:30,win:0,crit:false},
+ {k:'sec',g:'Aviation',name:'Airport Security Pass',code:'SEC',auth:'Airport Authority',valid:12,eom:false,thr:30,win:0,crit:true},
+ {k:'id',g:'Personal',name:'ID / Resident Card',code:'ID',auth:'',valid:0,eom:false,thr:30,win:0,crit:false},
+ {k:'hins',g:'Personal',name:'Health Insurance Card',code:'HINS',auth:'',valid:12,eom:false,thr:30,win:0,crit:false},
+ {k:'dl',g:'Personal',name:'Driving Licence',code:'DL',auth:'',valid:0,eom:false,thr:30,win:0,crit:false},
+ {k:'mlk',g:'Personal',name:'Vehicle Registration (Mulkiya)',code:'MLK',auth:'',valid:12,eom:false,thr:30,win:0,crit:false},
+ {k:'ins',g:'Personal',name:'Vehicle Insurance',code:'INS',auth:'',valid:12,eom:false,thr:30,win:0,crit:false},
+ {k:'custom',g:'Personal',name:'',code:'DOC',auth:'',valid:0,eom:false,thr:null,win:0,crit:false}
+];
+var LEADS=[90,60,30,14,7,1];
+var MSOPTS=[60,30,14,7,1];
+var DEF_SET={threshold:7,leads:[30,14,7],alarmTime:'09:00',renewalEvent:true,windowEvent:true,audio:true,includeRef:false,theme:'system',ocrArabic:false};
+var DEF_EM={provider:'off',to:'',ejsService:'',ejsTemplate:'',ejsPublic:'',relayUrl:'',relayToken:'',milestones:[30,14,7],expired:true,auto:true};
+
+/* ---------- storage ---------- */
+var storageOK=true;
+function load(){
+  var d=null; try{d=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storageOK=false}
+  d=d||{};
+  return {ver:VER,docs:Array.isArray(d.docs)?d.docs:[],family:Array.isArray(d.family)?d.family:[],settings:Object.assign({},DEF_SET,d.settings||{}),email:Object.assign({},DEF_EM,d.email||{}),sent:d.sent||{},log:Array.isArray(d.log)?d.log:[],lastAuto:d.lastAuto||0};
+}
+function save(){try{S.ver=VER;localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false;toast('Not saved: browser storage is unavailable here')}}
+var UI=(function(){try{return JSON.parse(localStorage.getItem(UIKEY)||'null')||{}}catch(e){return {}}})();
+UI.tab=UI.tab||'docs'; UI.filter=UI.filter||'all';
+function saveUI(){try{localStorage.setItem(UIKEY,JSON.stringify(UI))}catch(e){}}
+var S=load();
+
+/* ---------- dates (date-only, UTC day numbers to dodge DST) ---------- */
+var MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function todayN(){var t=new Date();return Date.UTC(t.getFullYear(),t.getMonth(),t.getDate())/864e5}
+function isoN(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))return NaN;var p=s.split('-').map(Number);return Date.UTC(p[0],p[1]-1,p[2])/864e5}
+function nIso(n){return new Date(n*864e5).toISOString().slice(0,10)}
+function fmt(v){var n=typeof v==='number'?v:isoN(v);if(isNaN(n))return '—';var d=new Date(n*864e5);return String(d.getUTCDate()).padStart(2,'0')+' '+MON[d.getUTCMonth()]+' '+d.getUTCFullYear()}
+function compact(n){return nIso(n).replace(/-/g,'')}
+function addMonths(iso,mo,eom){var p=iso.split('-').map(Number);var last=new Date(Date.UTC(p[0],p[1]-1+mo+1,0)).getUTCDate();var day=eom?last:Math.min(p[2],last);return nIso(Date.UTC(p[0],p[1]-1+mo,day)/864e5)}
+function num(v,d){var n=parseInt(v,10);return isNaN(n)?d:n}
+
+function info(doc){
+  var t=todayN(),e=isoN(doc.expiry),days=e-t,thr=num(doc.threshold,S.settings.threshold);
+  var st=isNaN(e)?'warn':days<0?'bad':days<=thr?'warn':'ok';
+  var win=num(doc.window,0);
+  return {days:days,thr:thr,st:st,e:e,remind:e-thr,win:win>0?e-win:null};
+}
+function sorted(){return S.docs.slice().sort(function(a,b){return isoN(a.expiry)-isoN(b.expiry)})}
+
+/* ---------- utils ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function uid(){return 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function slug(s){return String(s||'doc').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'doc'}
+function mask(r){r=String(r||'').trim();if(!r)return '';return r.length<=4?r:'•••• '+r.slice(-4)}
+var toastT;
+function toast(msg){var t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},3200)}
+function daysWord(n){return Math.abs(n)===1?'1 day':Math.abs(n)+' days'}
+
+var IC={
+ g:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
+ a:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5M5 20h14"/></svg>',
+ e:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+ clip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>',
+ cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
+ up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>',
+ sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+ moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>',
+ sys:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>'
+};
+
+/* ---------- theme ---------- */
+function applyTheme(){
+  var th=S.settings.theme,root=document.documentElement;
+  if(th==='light'||th==='dark')root.setAttribute('data-theme',th);else if(!inFrame)root.removeAttribute('data-theme');
+  $('#themeBtn').innerHTML=th==='light'?IC.sun:th==='dark'?IC.moon:IC.sys;
+  $('#themeBtn').setAttribute('aria-label','Theme: '+th+'. Tap to change');
+  var m=document.querySelector('meta[name="theme-color"]');
+  if(m){var dark=th==='dark'||(th==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);m.setAttribute('content',dark?'#0b1420':'#edf1f5')}
+}
+
+/* ---------- family ---------- */
+var RELS=['Spouse','Son','Daughter','Father','Mother','Brother','Sister','Other'];
+var AV_ONLY={med1:1,lic:1,lpc:1,opc:1,line:1,crm:1,sep:1,dg:1,elp:1,sec:1};
+function mine(){return S.docs.filter(function(d){return !d.owner})}
+function famDocs(mid){return S.docs.filter(function(d){return mid?d.owner===mid:!!d.owner})}
+function member(id){return S.family.find(function(m){return m.id===id})}
+function shortName(m){return m?String(m.name).trim().split(/\s+/)[0]:'Family'}
+function ownerName(d){if(!d.owner)return 'Me';return shortName(member(d.owner))}
+function docLabel(d){return d.owner?d.name+' — '+ownerName(d):d.name}
+function sortedOf(list){return list.slice().sort(function(a,b){return isoN(a.expiry)-isoN(b.expiry)})}
+function worst(list){var w='ok';list.forEach(function(d){var s=info(d).st;if(s==='bad')w='bad';else if(s==='warn'&&w!=='bad')w='warn'});return w}
+function initials(n){var p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase()}
+function presetOpts(sel,fam){
+  var groups=fam?[['Travel & residence',function(p){return p.k==='ppt'||p.k==='visa'||p.k==='id'}],['Other',function(p){return !AV_ONLY[p.k]&&p.k!=='ppt'&&p.k!=='visa'&&p.k!=='id'}]]
+                :[['Aviation',function(p){return p.g==='Aviation'}],['Personal',function(p){return p.g==='Personal'}]];
+  return '<option value="">— Choose a document type —</option>'+groups.map(function(g){return '<optgroup label="'+g[0]+'">'+PRESETS.filter(g[1]).map(function(p){return '<option value="'+p.k+'"'+(sel===p.k?' selected':'')+'>'+esc(p.name||'Custom document')+'</option>'}).join('')+'</optgroup>'}).join('');
+}
+function ownerField(owner){
+  if(!S.family.length&&!owner)return '';
+  return '<div class="field"><label for="fOwner">Belongs to</label><select id="fOwner"><option value="">Me</option>'+S.family.map(function(m){return '<option value="'+m.id+'"'+(owner===m.id?' selected':'')+'>'+esc(m.name)+' ('+esc(m.relation)+')</option>'}).join('')+'</select></div>';
+}
+function syncOwnerUI(rebuild){
+  var o=$('#fOwner'),fam=!!(o&&o.value);
+  var cf=$('#catField'),kf=$('#critField');if(cf)cf.hidden=fam;if(kf)kf.hidden=fam;if(fam&&$('#fCrit'))$('#fCrit').checked=false;
+  if(rebuild){var pr=$('#fPreset'),v=pr.value;pr.innerHTML=presetOpts(fam&&AV_ONLY[v]?'':v,fam)}
+}
+function matchMember(r){
+  if(!r||!S.family.length)return null;
+  var up=normDigits(r.text||'').toUpperCase(),toks=up.split(/[^A-Z]+/).filter(function(x){return x.length>=3});
+  var hold=r.mrz&&r.mrz.holder?String(r.mrz.holder).toUpperCase().split(/[^A-Z]+/).filter(Boolean):null;
+  var dobs=r.mrz&&r.mrz.dob?[r.mrz.dob]:(r.cands||[]).concat(findDates(r.text||'',r.preset)).filter(function(c){return c.label==='issue/birth label'}).map(function(c){return c.iso});
+  var best=null,bs=0;
+  S.family.forEach(function(m){var first=(String(m.name).toUpperCase().match(/[A-Z]{3,}/)||[''])[0],s=0;
+    if(m.dob&&dobs.indexOf(m.dob)>-1)s+=3;
+    if(first){if(hold){if(hold[0]===first)s+=2}else if(toks.indexOf(first)>-1)s+=2}
+    if(s>bs){bs=s;best=m.id}});
+  return bs>=2?best:null;
+}
+var FAM_EMPTY='<p class="note">Add passport, visa and residence card. Scan the passport photo page to fill it in.</p>';
+function renderFamily(){
+  var fam=famDocs(),c={ok:0,warn:0,bad:0};fam.forEach(function(d){c[info(d).st]++});
+  var due=c.warn+c.bad,b=$('#famBadge');b.hidden=!due;b.textContent=due;
+  $('#sampleBanner2').hidden=!(S.family.some(function(m){return m.sample})||fam.some(function(d){return d.sample}));
+  var sum=$('#famSummary');
+  if(!S.family.length){sum.innerHTML='<div class="empty" style="border:0;padding:12px"><h3>No family members yet</h3><p class="muted">Add your spouse and children, then track their passports, visas and residence cards with the same alerts as yours.</p><div class="row" style="justify-content:center"><button class="btn primary" data-act="add-member">Add family member</button><button class="btn" data-act="load-sample">Load sample data</button></div></div>';$('#famFilters').innerHTML='';$('#famList').innerHTML='';return}
+  var t=todayN(),next=sortedOf(fam).filter(function(d){return info(d).days>=0})[0];
+  var ppt6=fam.filter(function(d){return d.preset==='ppt'&&info(d).days<183});
+  sum.innerHTML='<div class="fam-sum"><div class="counts" style="margin:0"><span class="pill ok"><span class="dot"></span>'+c.ok+' valid</span><span class="pill warn"><span class="dot"></span>'+c.warn+' due</span><span class="pill bad"><span class="dot"></span>'+c.bad+' expired</span><span class="pill neutral">'+S.family.length+' member'+(S.family.length>1?'s':'')+'</span></div>'+
+   '<div class="note">'+(next?'Next expiry: <b>'+esc(docLabel(next))+'</b> · '+fmt(next.expiry)+' ('+daysWord(info(next).days)+')':'No upcoming expiries.')+'</div>'+
+   (ppt6.length?'<div class="note" style="color:var(--warn)">'+ppt6.length+' passport'+(ppt6.length>1?'s':'')+' under 6 months validity: '+ppt6.map(function(d){return esc(ownerName(d))}).join(', ')+'. Many states refuse entry.</div>':'')+'</div>';
+  var f=UI.famFilter||'all';if(f!=='all'&&!member(f))f=UI.famFilter='all';
+  $('#famFilters').innerHTML='<button class="chip" data-act="fam-filter" data-f="all" aria-pressed="'+(f==='all')+'">All <span class="n">'+fam.length+'</span></button>'+S.family.map(function(m){var n=famDocs(m.id).length;return '<button class="chip" data-act="fam-filter" data-f="'+m.id+'" aria-pressed="'+(f===m.id)+'">'+esc(shortName(m))+' <span class="n">'+n+'</span></button>'}).join('');
+  $('#famList').innerHTML=S.family.filter(function(m){return f==='all'||m.id===f}).map(function(m){
+    var docs=sortedOf(famDocs(m.id)),w=docs.length?worst(docs):'neutral',wl={ok:'All valid',warn:'Due',bad:'Expired',neutral:'No documents'}[w];
+    return '<section class="member"><header class="member-h"><span class="avatar">'+esc(initials(m.name))+'</span><div style="min-width:0;flex:1"><div class="m-name">'+esc(m.name)+(m.sample?' <span class="tag">Sample</span>':'')+'</div><div class="note">'+esc(m.relation)+(m.nat?' · '+esc(m.nat):'')+' · '+docs.length+' document'+(docs.length===1?'':'s')+'</div></div><span class="pill '+w+'"><span class="dot"></span>'+wl+'</span><button class="icon-btn" data-act="edit-member" data-id="'+m.id+'" aria-label="Edit '+esc(m.name)+'">'+IC.e+'</button></header>'+
+      '<div class="list">'+(docs.length?docs.map(docCard).join(''):FAM_EMPTY)+'</div>'+
+      '<div class="row"><button class="btn sm" data-act="scan-for" data-id="'+m.id+'">'+IC.cam+'Scan for '+esc(shortName(m))+'</button><button class="btn sm" data-act="add-for" data-id="'+m.id+'">+ Add document</button></div></section>'}).join('');
+}
+function memberSheet(id){
+  var m=id?member(id):null,isNew=!m;m=m||{id:'m'+uid().slice(1),name:'',relation:'Spouse',dob:'',nat:''};
+  var n=famDocs(m.id).length;
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">'+(isNew?'Add family member':'Edit family member')+'</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<form class="form" id="memForm" novalidate>'+
+   '<div class="grid2"><div class="field"><label for="mName">Name</label><input id="mName" type="text" required value="'+esc(m.name)+'" placeholder="As in passport"></div>'+
+   '<div class="field"><label for="mRel">Relation</label><select id="mRel">'+RELS.map(function(r){return '<option'+(m.relation===r?' selected':'')+'>'+r+'</option>'}).join('')+'</select></div></div>'+
+   '<div class="grid2"><div class="field"><label for="mDob">Date of birth (optional)</label><input id="mDob" type="date" value="'+esc(m.dob)+'"><span class="hint">Lets passport scans assign themselves to this person.</span></div>'+
+   '<div class="field"><label for="mNat">Nationality (optional)</label><input id="mNat" type="text" value="'+esc(m.nat)+'" placeholder="e.g. Libyan"></div></div>'+
+   '<p class="note" id="memErr" style="color:var(--bad)" hidden>Enter a name.</p><div id="memDel"></div>'+
+   '<div class="sheet-f">'+(isNew?'':'<button type="button" class="btn danger" data-act="member-del-ask" data-id="'+m.id+'" data-n="'+n+'" style="margin-right:auto">Delete</button>')+'<button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary">'+(isNew?'Add member':'Save')+'</button></div></form>');
+  $('#memForm').addEventListener('submit',function(e){e.preventDefault();var nm=$('#mName').value.trim();if(!nm){$('#memErr').hidden=false;return}
+    var rec=Object.assign({},m,{name:nm,relation:$('#mRel').value,dob:$('#mDob').value,nat:$('#mNat').value.trim()});if(!isNew)rec.sample=false;
+    if(isNew)S.family.push(rec);else S.family[S.family.findIndex(function(x){return x.id===m.id})]=rec;
+    save();closeSheet();UI.famFilter='all';saveUI();renderAll();toast(isNew?'Added '+nm:'Saved '+nm)});
+}
+function deleteMember(id){var m=member(id);famDocs(id).forEach(function(d){(d.files||[]).forEach(function(f){FS.del(f.id).catch(function(){})})});
+  S.docs=S.docs.filter(function(d){return d.owner!==id});S.family=S.family.filter(function(x){return x.id!==id});save();closeSheet();renderAll();toast('Removed '+(m?m.name:'member'))}
+function sampleFamily(){
+  var sp={id:'m'+uid().slice(1),name:'Spouse',relation:'Spouse',dob:'',nat:'',sample:true},sn={id:'m'+uid().slice(1),name:'Son',relation:'Son',dob:'',nat:'',sample:true},dt={id:'m'+uid().slice(1),name:'Daughter',relation:'Daughter',dob:'',nat:'',sample:true};
+  var rows=[[sp,'ppt','Passport','PPT','2019-05-14',120,'2029-05-14',180,'' ],[sp,'id','Oman Resident Card','ID','2025-01-10',24,'2027-01-10',60,'Renew with sponsor letter.'],[sp,'visa','Schengen Visa','VISA','2026-02-20',6,'2026-08-20',30,'Lapsed after summer trip.'],
+    [sn,'ppt','Passport','PPT','2021-12-05',60,'2026-12-05',180,'Child passport, 5-year validity. Renew before next trip.'],[sn,'id','Oman Resident Card','ID','2025-01-10',24,'2027-01-10',60,''],
+    [dt,'ppt','Passport','PPT','2025-02-02',60,'2030-02-02',180,''],[dt,'id','Oman Resident Card','ID','2024-11-01',24,'2026-11-01',60,'']];
+  return {members:[sp,sn,dt],docs:rows.map(function(r){return {id:uid(),owner:r[0].id,preset:r[1],name:r[2],category:'Family',code:r[3],authority:'',ref:'',issue:r[4],validity:String(r[5]),eom:false,expiry:r[6],threshold:r[7],window:0,critical:false,notes:r[8],sample:true,files:[],updated:new Date().toISOString()}})};
+}
+
+/* ---------- render: docs ---------- */
+function groupState(){
+  var crit=mine().filter(function(d){return d.critical});
+  var bad=crit.filter(function(d){return info(d).st==='bad'}),warn=crit.filter(function(d){return info(d).st==='warn'});
+  return {bad:bad,warn:warn,crit:crit};
+}
+function renderAnnun(){
+  var el=$('#annun'),g=groupState(),all=mine().map(info);
+  var c={ok:0,warn:0,bad:0};all.forEach(function(i){c[i.st]++});
+  var cls,lamp,head,sub;
+  if(!mine().length){cls='ok';lamp='—';head='No documents yet';sub='Add your licence, medical and checks, or load the pilot sample.'}
+  else if(g.bad.length){cls='bad';lamp='NO-GO';head=g.bad.map(function(d){return d.name}).join(', ')+' expired';sub='Flight-critical document invalid. Do not operate until renewed.'}
+  else if(g.warn.length){cls='warn';lamp='CAUTION';head=g.warn.length+' flight-critical item'+(g.warn.length>1?'s':'')+' inside alert window';sub='Next: '+g.warn.sort(function(a,b){return isoN(a.expiry)-isoN(b.expiry)}).map(function(d){return d.name+' ('+daysWord(info(d).days)+')'}).slice(0,2).join(' · ')}
+  else {cls='ok';lamp='GO';head='All flight-critical documents valid';sub=g.crit.length+' tracked as flight-critical.'}
+  el.className='annun '+cls;
+  el.innerHTML='<div class="lamp">'+lamp+'</div><div class="head">'+esc(head)+'</div><div class="muted" style="font-size:.86rem">'+esc(sub)+'</div>'+
+   '<div class="counts"><span class="pill ok"><span class="dot"></span>'+c.ok+' valid</span><span class="pill warn"><span class="dot"></span>'+c.warn+' due</span><span class="pill bad"><span class="dot"></span>'+c.bad+' expired</span><span class="pill neutral">'+S.docs.length+' total</span></div>';
+  var due=c.warn+c.bad,b=$('#docBadge');b.hidden=!due;b.textContent=due;
+}
+function renderRunway(){
+  var el=$('#runway'),t=todayN(),span=365;
+  if(!mine().length){el.hidden=true;return}el.hidden=false;
+  var items=sortedOf(mine()).map(function(d){var i=info(d);return {d:d,i:i,p:Math.max(0,Math.min(i.days,span))/span*100}});
+  var lanes=[],marks='';
+  items.forEach(function(o){var l=0;while(lanes[l]!=null&&o.p-lanes[l]<2.6)l++;lanes[l]=o.p;o.l=l});
+  var nl=Math.max(1,lanes.length),h=Math.max(36,nl*14+12);
+  items.forEach(function(o){var top=(h-(nl*14))/2+o.l*14+1;
+    marks+='<button class="rw-mark '+o.i.st+'" style="left:'+o.p.toFixed(2)+'%;top:'+top+'px" data-act="edit" data-id="'+o.d.id+'" title="'+esc(o.d.name)+' · '+fmt(o.i.e)+'" aria-label="'+esc(o.d.name)+', '+fmt(o.i.e)+'"></button>'});
+  var ticks='',labels='<span style="left:0">NOW</span>',d0=new Date(t*864e5);
+  for(var k=1;k<=12;k++){var n=Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth()+k,1)/864e5,p=(n-t)/span*100;if(p>100)break;
+    ticks+='<div class="rw-tick" style="left:'+p.toFixed(2)+'%"></div>';if(k%2===0||k===1)labels+='<span style="left:'+p.toFixed(2)+'%">'+MON[new Date(n*864e5).getUTCMonth()]+'</span>'}
+  var nxt=items.filter(function(o){return o.i.days>=0})[0];
+  el.innerHTML='<div class="rw-head"><span class="eyebrow">Next 12 months</span><span class="note">'+(nxt?'Next expiry: <b>'+esc(nxt.d.name)+'</b> · '+fmt(nxt.i.e):'All tracked items expired')+'</span></div>'+
+   '<div class="rw-track" style="--rw-h:'+h+'px">'+ticks+marks+'</div><div class="rw-labels">'+labels+'</div>';
+}
+var FILTERS=[['all','All'],['Aviation','Aviation'],['Personal','Personal'],['due','Due'],['expired','Expired']];
+function passes(d,f){var s=info(d).st;return f==='all'||(f==='due'&&s==='warn')||(f==='expired'&&s==='bad')||d.category===f}
+function renderFilters(){
+  $('#filters').innerHTML=FILTERS.map(function(f){var n=mine().filter(function(d){return passes(d,f[0])}).length;
+    return '<button class="chip" data-act="filter" data-f="'+f[0]+'" aria-pressed="'+(UI.filter===f[0])+'">'+f[1]+' <span class="n">'+n+'</span></button>'}).join('');
+}
+function docCard(d){
+  var i=info(d),lbl=i.st==='bad'?'Expired':i.st==='warn'?'Due':'Valid';
+  var big=isNaN(i.days)?'?':Math.abs(i.days);
+  var bl=isNaN(i.days)?'No date':i.days<0?(Math.abs(i.days)===1?'day over':'days over'):i.days===0?'expires today':i.days===1?'day left':'days left';
+  var sub=[d.authority,mask(d.ref)].filter(Boolean).join(' · ');
+  return '<article class="doc '+i.st+'">'+
+   '<div class="doc-main"><div class="doc-tags"><span class="tag code">'+esc(d.code||'DOC')+'</span><span class="pill '+i.st+'"><span class="dot"></span>'+lbl+'</span>'+(d.critical?'<span class="tag crit">Flight-critical</span>':'')+(d.sample?'<span class="tag">Sample</span>':'')+'</div>'+
+   '<div class="doc-name">'+esc(d.name)+'</div>'+(sub?'<div class="doc-sub">'+esc(sub)+'</div>':'')+'</div>'+
+   '<div class="doc-days"><div class="big">'+big+'</div><div class="lbl">'+bl+'</div></div>'+
+   '<div class="doc-meta"><span>Expires <b>'+fmt(i.e)+'</b></span><span>Alert <b>'+i.thr+'d</b> → <b>'+fmt(i.remind)+'</b></span>'+(i.win!=null?'<span>Window opens <b>'+fmt(i.win)+'</b></span>':'')+'</div>'+
+   '<div class="doc-actions"><a class="btn sm grow" href="'+esc(gcalURL(d,'renew'))+'" target="_blank" rel="noopener">'+IC.g+'Google Calendar</a>'+
+   '<button class="btn sm grow" data-act="ics" data-id="'+d.id+'">'+IC.a+'Apple Calendar (.ics)</button>'+
+   (d.files&&d.files.length?'<button class="btn sm" data-act="files" data-id="'+d.id+'" aria-label="'+d.files.length+' attached files">'+IC.clip+d.files.length+'</button>':'')+
+   '<button class="btn sm" data-act="edit" data-id="'+d.id+'" aria-label="Edit '+esc(d.name)+'">'+IC.e+'Edit</button></div></article>';
+}
+function renderDocs(){
+  renderAnnun();renderRunway();renderFilters();
+  $('#sampleBanner').hidden=!S.docs.some(function(d){return d.sample});
+  var list=sortedOf(mine()).filter(function(d){return passes(d,UI.filter)}),el=$('#docList');
+  if(!mine().length){el.innerHTML='<div class="empty"><h3>No documents tracked</h3><p class="muted">Start with your Medical, LPC/OPC and passport, or load realistic pilot data to test.</p><div class="row" style="justify-content:center"><button class="btn primary" data-act="add">Add document</button><button class="btn" data-act="load-sample">Load pilot sample data</button></div></div>';return}
+  if(!list.length){el.innerHTML='<div class="empty"><p class="muted">Nothing in this filter.</p></div>';return}
+  var html='';
+  ['Aviation','Personal'].forEach(function(g){var items=list.filter(function(d){return (d.category||'Personal')===g});
+    if(items.length){html+='<div class="group-h"><span class="eyebrow">'+(g==='Aviation'?'Aviation & travel':'Personal assets')+'</span></div>'+items.map(docCard).join('')}});
+  el.innerHTML=html;
+}
+
+/* ---------- render: sync ---------- */
+function leadsList(thr){var s={};s[thr]=1;S.settings.leads.forEach(function(l){s[l]=1});s[0]=1;return Object.keys(s).map(Number).sort(function(a,b){return b-a})}
+function renderSync(){
+  $('#leadsTxt').textContent=S.settings.leads.slice().sort(function(a,b){return b-a}).concat(['threshold','expiry day']).map(function(x){return typeof x==='number'?x+'d':x}).join(', ');
+  $('#alarmTimeTxt').textContent=S.settings.alarmTime;
+  var evN=0;S.docs.forEach(function(d){evN+=buildEvents(d).length});
+  $('#bulkCount').textContent=S.docs.length?S.docs.length+' documents ('+mine().length+' mine, '+famDocs().length+' family) → '+evN+' events':'No documents yet';
+  $('#gcalList').innerHTML=S.docs.length?sorted().map(function(d){var i=info(d);
+    return '<div class="gcal-item"><div class="nm"><span class="pill '+i.st+'" style="margin-right:6px"><span class="dot"></span>'+esc(d.code)+'</span>'+esc(docLabel(d))+'<div class="note mono">Renew '+fmt(Math.max(i.remind,todayN()))+' · Exp '+fmt(i.e)+'</div></div>'+
+    '<div class="row"><a class="btn sm" target="_blank" rel="noopener" href="'+esc(gcalURL(d,'renew'))+'">'+IC.g+'Renewal</a><a class="btn sm" target="_blank" rel="noopener" href="'+esc(gcalURL(d,'expiry'))+'">Expiry day</a></div></div>'}).join(''):'<p class="note">Add documents first.</p>';
+  $('#schedBody').innerHTML=sorted().map(function(d){var i=info(d);
+    return '<tr><td><span class="pill '+i.st+'"><span class="dot"></span>'+esc(d.code)+'</span> '+esc(docLabel(d))+'</td><td class="mono">'+(i.win!=null?fmt(i.win):'—')+'</td><td class="mono">'+fmt(i.remind)+'</td><td class="mono">'+fmt(i.e)+'</td><td class="mono">'+i.days+'</td></tr>'}).join('')||'<tr><td colspan="5" class="muted">No documents.</td></tr>';
+}
+
+/* ---------- render: email ---------- */
+function renderEmail(){
+  var e=S.email;
+  $('#emProvider').value=e.provider;$('#emTo').value=e.to;$('#ejsService').value=e.ejsService;$('#ejsTemplate').value=e.ejsTemplate;$('#ejsPublic').value=e.ejsPublic;
+  $('#relayUrl').value=e.relayUrl;$('#relayToken').value=e.relayToken;$('#emExpired').checked=!!e.expired;$('#emAuto').checked=!!e.auto;
+  $('#ejsBox').hidden=e.provider!=='emailjs';$('#resendBox').hidden=e.provider!=='resend';
+  $('#msChecks').innerHTML=MSOPTS.map(function(m){return '<label class="check"><input type="checkbox" data-ms="'+m+'"'+(e.milestones.indexOf(m)>-1?' checked':'')+'> '+m+' days</label>'}).join('');
+  $('#emStatus').textContent=inFrame?'Inside the Claude preview, outbound requests are blocked. Email works from the hosted copy.':(e.provider==='off'?'Email alerts are off.':'Ready. Last automatic check: '+(S.lastAuto?new Date(S.lastAuto).toLocaleString():'never')+'.');
+  $('#emLog').innerHTML=S.log.length?S.log.slice(0,20).map(function(l){return '<div><span class="mono">'+esc(l.t)+'</span> · '+esc(l.m)+'</div>'}).join(''):'<p class="note">No emails sent yet.</p>';
+}
+
+/* ---------- render: settings ---------- */
+function renderSettings(){
+  var s=S.settings;
+  $('#setThr').value=s.threshold;$('#setTime').value=s.alarmTime;$('#setRenew').checked=s.renewalEvent;$('#setWindow').checked=s.windowEvent;$('#setAudio').checked=s.audio;$('#setRef').checked=s.includeRef;
+  $('#leadChecks').innerHTML=LEADS.map(function(l){return '<label class="check"><input type="checkbox" data-lead="'+l+'"'+(s.leads.indexOf(l)>-1?' checked':'')+'> '+l+'d</label>'}).join('');
+  $('#modeTxt').textContent=inFrame?'Claude preview (not installable)':isStandalone?'Home Screen app':'Browser tab';
+  $('#swTxt').textContent=inFrame?'n/a in preview':('serviceWorker' in navigator)?(navigator.serviceWorker.controller?'Active':'Registering / not hosted over HTTPS'):'Not supported';
+  $('#storageNote').textContent=storageOK?(S.docs.length+' documents stored locally.'):'Storage unavailable in this view. Changes last until you close the page.';
+  $('#setArabic').checked=!!s.ocrArabic;
+  var fst=fileStats();$('#filesTxt').textContent=fst.n+' file'+(fst.n===1?'':'s')+' · '+kb(fst.sz);
+  if(!$('#ocrState').textContent)$('#ocrState').textContent=ocrW?'Ready ('+ocrLang+')':(inFrame?'OCR engine unavailable in the Claude preview':'Loads on first scan');
+  try{if(navigator.storage&&navigator.storage.estimate)navigator.storage.estimate().then(function(q){$('#quotaTxt').textContent=kb(q.usage)+' of '+kb(q.quota)})}catch(e){}
+  $('#footVer').textContent='AERODOCS v'+VER+' · BUILD '+BUILD+' · DATA LOCAL TO THIS DEVICE';
+}
+
+function renderAll(){
+  $('#todayLbl').textContent=fmt(todayN());$('#verTag').textContent='v'+VER;
+  renderDocs();renderFamily();renderSync();renderEmail();renderSettings();applyTheme();showTab(UI.tab,true);
+}
+function showTab(t,silent){
+  UI.tab=t;saveUI();
+  $$('section[data-tab]').forEach(function(s){s.hidden=s.id!=='tab-'+t});
+  $$('.tab').forEach(function(b){b.setAttribute('aria-selected',String(b.getAttribute('data-tab')===t))});
+  if(!silent)window.scrollTo(0,0);
+}
+
+/* ---------- calendar: Google ---------- */
+function descText(d,i){
+  var L=['Document: '+d.name+(d.owner?' ('+ownerName(d)+')':''),'Expires: '+fmt(i.e),'Alert threshold: '+i.thr+' days (renew by '+fmt(i.remind)+')'];
+  if(i.win!=null)L.push('Revalidation window opens: '+fmt(i.win));
+  if(d.authority)L.push('Issuer: '+d.authority);
+  if(S.settings.includeRef&&d.ref)L.push('Ref: '+d.ref);
+  if(d.critical)L.push('FLIGHT-CRITICAL — invalid document grounds the crew member.');
+  if(d.notes)L.push('Notes: '+d.notes);
+  L.push('— AeroDocs v'+VER);
+  return L.join('\n');
+}
+function gcalURL(d,kind){
+  var i=info(d),n,title;
+  if(isNaN(i.e))return '#';
+  if(kind==='expiry'){n=i.e;title='EXPIRES · '+docLabel(d)}
+  else{n=Math.max(i.remind,todayN());title='RENEW · '+docLabel(d)+' (exp '+fmt(i.e)+')'}
+  var tz='UTC';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){}
+  var q=[['action','TEMPLATE'],['text',title],['dates',compact(n)+'/'+compact(n+1)],['details',descText(d,i)],['ctz',tz],['trp','false']];
+  return 'https://calendar.google.com/calendar/render?'+q.map(function(p){return p[0]+'='+encodeURIComponent(p[1])}).join('&');
+}
+
+/* ---------- calendar: iCalendar (RFC 5545) ---------- */
+function icsEsc(s){return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n')}
+function fold(line){
+  var enc=new TextEncoder(),out=[],cur='',len=0,lim=75;
+  Array.from(line).forEach(function(ch){var b=enc.encode(ch).length;if(len+b>lim){out.push(cur);cur=ch;len=1+b;lim=75}else{cur+=ch;len+=b}});
+  out.push(cur);return out.join('\r\n ');
+}
+function trig(daysBefore,time){
+  var hm=(time||'09:00').split(':').map(Number),mins=-daysBefore*1440+hm[0]*60+(hm[1]||0),neg=mins<0;mins=Math.abs(mins);
+  var D=Math.floor(mins/1440),H=Math.floor(mins%1440/60),M=mins%60,s=(neg?'-':'')+'P';
+  if(D)s+=D+'D';if(H||M||!D){s+='T';if(H)s+=H+'H';if(M)s+=M+'M';if(!H&&!M)s+='0M'}
+  return s;
+}
+function buildEvents(d){
+  var i=info(d),st=S.settings,ev=[],t=todayN();if(isNaN(i.e))return ev;
+  var cats='AeroDocs,'+(d.category||'Personal'),desc=descText(d,i),key=d.id+'-'+compact(i.e);
+  var al=leadsList(i.thr).map(function(n){return {action:'DISPLAY',trigger:trig(n,st.alarmTime),desc:n===0?docLabel(d)+' expires today':docLabel(d)+' expires in '+daysWord(n)+' ('+fmt(i.e)+')'}});
+  if(st.audio)al.push({action:'AUDIO',trigger:trig(i.thr,st.alarmTime)});
+  ev.push({uid:key+'-exp@aerodocs',date:i.e,summary:'EXPIRES · '+docLabel(d),desc:desc,cats:cats,alarms:al});
+  if(st.renewalEvent&&i.remind>=t&&i.thr>0){
+    var ra=[{action:'DISPLAY',trigger:trig(0,st.alarmTime),desc:'Renew '+d.name+' — expires '+fmt(i.e)}];if(st.audio)ra.push({action:'AUDIO',trigger:trig(0,st.alarmTime)});
+    ev.push({uid:key+'-renew@aerodocs',date:i.remind,summary:'RENEW · '+docLabel(d)+' (exp '+fmt(i.e)+')',desc:desc,cats:cats,alarms:ra});
+  }
+  if(st.windowEvent&&i.win!=null&&i.win>=t)ev.push({uid:key+'-window@aerodocs',date:i.win,summary:'WINDOW OPENS · '+docLabel(d),desc:'Revalidation window opens today. Completing now keeps the current expiry date.\n'+desc,cats:cats,alarms:[{action:'DISPLAY',trigger:trig(0,st.alarmTime),desc:'Revalidation window open: '+d.name}]});
+  return ev;
+}
+function icsFor(docs,calName){
+  var now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//AeroDocs//Pilot Expiry Tracker '+VER+'//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:'+icsEsc(calName)];
+  docs.forEach(function(d){buildEvents(d).forEach(function(e){
+    L.push('BEGIN:VEVENT','UID:'+e.uid,'DTSTAMP:'+now,'DTSTART;VALUE=DATE:'+compact(e.date),'DTEND;VALUE=DATE:'+compact(e.date+1),'SUMMARY:'+icsEsc(e.summary),'DESCRIPTION:'+icsEsc(e.desc),'CATEGORIES:'+e.cats,'TRANSP:TRANSPARENT','STATUS:CONFIRMED','SEQUENCE:'+Math.floor(Date.now()/1000));
+    e.alarms.forEach(function(a){L.push('BEGIN:VALARM','ACTION:'+a.action,'TRIGGER:'+a.trigger);if(a.action==='DISPLAY')L.push('DESCRIPTION:'+icsEsc(a.desc));L.push('END:VALARM')});
+    L.push('END:VEVENT');
+  })});
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n')+'\r\n';
+}
+
+/* ---------- file delivery ---------- */
+function deliver(name,mime,text){
+  if(inFrame){textSheet(name,text);return}
+  var blob=new Blob([text],{type:mime});
+  if(isIOS&&isStandalone&&navigator.canShare){
+    try{var f=new File([blob],name,{type:mime});if(navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(err){if(err&&err.name!=='AbortError')textSheet(name,text)});return}}catch(e){}
+  }
+  try{var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},5000);toast('Downloaded '+name)}
+  catch(e){textSheet(name,text)}
+}
+function textSheet(name,text){
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">'+esc(name)+'</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<p class="note" style="margin-bottom:10px">'+(inFrame?'Downloads are blocked inside the Claude preview. Copy the content below and save it as <span class="mono">'+esc(name)+'</span>, or run the hosted copy where this button downloads directly.':'Copy the content below and save it as <span class="mono">'+esc(name)+'</span>.')+'</p>'+
+   '<textarea id="txtOut" readonly style="min-height:220px;font-family:var(--f-mono);font-size:12px">'+esc(text)+'</textarea>'+
+   '<div class="sheet-f"><button class="btn primary" data-act="copy-out">Copy</button><button class="btn" data-act="close">Done</button></div>');
+}
+
+/* ---------- sheets ---------- */
+var sheetCloseCb=null;
+function openSheet(html,onClose){$('#sheet').innerHTML=html;$('#scrim').hidden=false;document.body.style.overflow='hidden';sheetCloseCb=onClose||null;var f=$('#sheet input:not([type=hidden]),#sheet select');if(f&&!isIOS)setTimeout(function(){f.focus()},50)}
+function closeSheet(){$('#scrim').hidden=true;$('#sheet').innerHTML='';document.body.style.overflow='';if(sheetCloseCb){var c=sheetCloseCb;sheetCloseCb=null;c()}}
+function confirmSheet(title,msg,ok,danger,fn){
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">'+esc(title)+'</h3></div><p class="muted">'+msg+'</p><div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn '+(danger?'danger solid':'primary')+'" id="cfOk">'+esc(ok)+'</button></div>');
+  $('#cfOk').onclick=function(){closeSheet();fn()};
+}
+
+/* ---------- editor ---------- */
+var ED=null;
+function presetBy(k){return PRESETS.find(function(x){return x.k===k})}
+function applyPreset(p){if(!p)return;
+  if(p.name&&(!$('#fName').value||PRESETS.some(function(x){return x.name===$('#fName').value})))$('#fName').value=p.name;
+  $('#fCat').value=p.g;$('#fCode').value=p.code;if(p.auth&&!$('#fAuth').value)$('#fAuth').value=p.auth;
+  $('#fValid').value=p.valid||'';$('#fEom').checked=p.eom;$('#fThr').value=p.thr==null?S.settings.threshold:p.thr;$('#fWin').value=p.win||0;$('#fCrit').checked=p.crit;
+  $('#presetHint').textContent=p.hint||'';syncOwnerUI(false);}
+function editor(id,opt){
+  opt=opt||{};
+  var ex=id?S.docs.find(function(x){return x.id===id}):null,isNew=!ex;
+  var d=ex?ex:{id:opt.id||uid(),owner:opt.owner||'',preset:'',name:'',category:opt.owner?'Family':'Aviation',code:'',authority:'',ref:'',issue:'',validity:'',eom:false,expiry:'',threshold:S.settings.threshold,window:0,critical:false,notes:'',files:[]};
+  ED={id:d.id,isNew:isNew,files:(d.files||[]).slice(),added:[],removed:[],orig:ex?ex.expiry:'',det:null,saved:false};
+  (opt.files||[]).forEach(function(m){ED.files.push(m);ED.added.push(m.id)});
+  var opts=presetOpts(d.preset,!!d.owner);
+  var hist=(d.history||[]).length?'<p class="hist">Previous expiries: '+d.history.map(function(h){return '<span class="mono">'+fmt(h.expiry)+'</span>'}).join(' · ')+'</p>':'';
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">'+(isNew?'Add document':'Edit document')+'</h3><button class="icon-btn" type="button" data-act="close" aria-label="Close">✕</button></div>'+
+  '<form class="form" id="docForm" novalidate>'+
+   '<div id="detBox" hidden></div>'+ownerField(d.owner||'')+
+   '<div class="field"><label for="fPreset">Document type</label><select id="fPreset">'+opts+'</select><span class="hint" id="presetHint"></span></div>'+
+   '<div class="field"><label for="fName">Name</label><input id="fName" type="text" required value="'+esc(d.name)+'" placeholder="e.g. A320 Type Rating LPC"></div>'+
+   '<div class="grid2"><div class="field" id="catField"><label for="fCat">Category</label><select id="fCat"><option'+(d.category==='Aviation'?' selected':'')+'>Aviation</option><option'+(d.category==='Personal'?' selected':'')+'>Personal</option></select></div>'+
+   '<div class="field"><label for="fCode">Short code</label><input id="fCode" type="text" maxlength="5" value="'+esc(d.code)+'" placeholder="LPC" style="text-transform:uppercase;font-family:var(--f-mono)"></div></div>'+
+   '<div class="grid2"><div class="field"><label for="fAuth">Issuer / authority</label><input id="fAuth" type="text" value="'+esc(d.authority)+'"></div>'+
+   '<div class="field"><label for="fRef">Reference no. (optional)</label><input id="fRef" type="text" value="'+esc(d.ref)+'" autocomplete="off"></div></div>'+
+   '<div class="calc"><div class="field"><label for="fIssue">Issue / check date</label><input id="fIssue" type="date" value="'+esc(d.issue)+'"></div>'+
+   '<div class="field" style="flex:0 1 110px"><label for="fValid">Validity (months)</label><input id="fValid" type="number" min="0" max="240" inputmode="numeric" value="'+esc(d.validity)+'"></div>'+
+   '<label class="check" style="flex:1 1 150px"><input type="checkbox" id="fEom"'+(d.eom?' checked':'')+'> Valid to end of month</label>'+
+   '<button type="button" class="btn sm" data-act="calc-exp">Compute expiry</button></div>'+
+   '<div class="grid2"><div class="field"><label for="fExp">Expiry date</label><input id="fExp" type="date" required value="'+esc(d.expiry)+'"></div>'+
+   '<div class="field"><label for="fThr">Alert threshold (days)</label><input id="fThr" type="number" min="0" max="730" inputmode="numeric" value="'+esc(d.threshold)+'"><span class="hint">Yellow status and calendar reminder start here.</span></div></div>'+
+   hist+
+   '<div class="grid2"><div class="field"><label for="fWin">Revalidation window (days before expiry)</label><input id="fWin" type="number" min="0" max="365" inputmode="numeric" value="'+esc(d.window||0)+'"><span class="hint">0 = none. LPC/OPC/Line Check: 90.</span></div>'+
+   '<div class="field" id="critField" style="justify-content:flex-end"><label class="check"><input type="checkbox" id="fCrit"'+(d.critical?' checked':'')+'> Flight-critical (drives GO / NO-GO)</label></div></div>'+
+   '<div class="field"><span class="lbl-t">Files</span><div class="files" id="edFiles"></div><span class="hint">Photos and PDFs stay on this device. Tap a file to view, share or read it again.</span></div>'+
+   '<div class="field"><label for="fNotes">Notes</label><textarea id="fNotes" placeholder="Booking reference, AME clinic, sim slot, documents needed…">'+esc(d.notes)+'</textarea></div>'+
+   '<p class="note" id="formErr" style="color:var(--bad)" hidden></p>'+
+   '<div id="delZone"></div>'+
+   '<div class="sheet-f">'+(isNew?'':'<button type="button" class="btn danger" data-act="ask-delete" data-id="'+d.id+'" style="margin-right:auto">Delete</button>')+'<button type="button" class="btn" data-act="close">Cancel</button><button type="submit" class="btn primary">'+(isNew?'Add document':'Save changes')+'</button></div>'+
+  '</form>',function(){
+    if(ED&&!ED.saved){ED.added.forEach(function(fid){FS.del(fid).catch(function(){})})}
+    ED=null;
+  });
+  var pr=$('#fPreset');
+  var p0=presetBy(pr.value);$('#presetHint').textContent=p0&&p0.hint?p0.hint:'';
+  pr.addEventListener('change',function(){applyPreset(presetBy(pr.value))});
+  if($('#fOwner'))$('#fOwner').addEventListener('change',function(){syncOwnerUI(true)});
+  syncOwnerUI(false);
+  renderEdFiles();
+  $('#fExp').addEventListener('change',function(){if(ED&&ED.det)renderDet()});
+  if(opt.detect)applyDetection(opt.detect);
+  $('#docForm').addEventListener('submit',function(ev){ev.preventDefault();
+    var name=$('#fName').value.trim(),exp=$('#fExp').value,err=$('#formErr');
+    if(!name||isNaN(isoN(exp))){err.hidden=false;err.textContent=!name?'Enter a document name.':'Enter a valid expiry date, or fill issue date and validity then tap Compute expiry.';return}
+    var rec=Object.assign({},ex||{},{id:ED.id,preset:pr.value,name:name,category:$('#fCat').value,code:($('#fCode').value.trim()||'DOC').toUpperCase(),authority:$('#fAuth').value.trim(),ref:$('#fRef').value.trim(),
+      issue:$('#fIssue').value,validity:$('#fValid').value,eom:$('#fEom').checked,expiry:exp,threshold:Math.max(0,num($('#fThr').value,S.settings.threshold)),window:Math.max(0,num($('#fWin').value,0)),critical:$('#fCrit').checked,notes:$('#fNotes').value.trim(),files:ED.files.slice(),updated:new Date().toISOString()});
+    rec.owner=$('#fOwner')?$('#fOwner').value:((ex&&ex.owner)||'');if(rec.owner){rec.category='Family';rec.critical=false}
+    if(ex&&ex.expiry&&ex.expiry!==exp){rec.history=(ex.history||[]).concat([{expiry:ex.expiry,replaced:nIso(todayN())}]).slice(-10)}
+    ED.removed.forEach(function(fid){FS.del(fid).catch(function(){})});
+    if(isNew){S.docs.push(rec)}else{rec.sample=false;var ix=S.docs.findIndex(function(x){return x.id===ex.id});S.docs[ix]=rec}
+    ED.saved=true;save();closeSheet();renderAll();toast(isNew?'Added '+docLabel(rec):'Saved '+docLabel(rec));
+  });
+}
+function renderEdFiles(){
+  var el=$('#edFiles');if(!el||!ED)return;
+  el.innerHTML=ED.files.map(function(m,i){var ty=/pdf/.test(m.type)?'PDF':/image/.test(m.type)?'IMG':'FILE';
+    return '<button type="button" class="fthumb" data-act="view-ed" data-i="'+i+'" aria-label="View '+esc(m.name)+'">'+(m.thumb?'<img src="'+m.thumb+'" alt="">':'<span class="ph">'+ty+'</span>')+'<span class="ty">'+ty+(m.pages>1?' · '+m.pages+'p':'')+'</span><span class="fn">'+esc(m.name)+'</span></button>'}).join('')+
+   '<label class="fadd" for="edCam">'+IC.cam+'Take photo</label><label class="fadd" for="edFile">'+IC.up+'Upload photo or PDF</label>';
+}
+
+/* ---------- file store (IndexedDB) ---------- */
+var FS={db:null,
+  open:function(){var self=this;return new Promise(function(res,rej){if(self.db)return res(self.db);if(!window.indexedDB)return rej(new Error('File storage (IndexedDB) is unavailable in this browser'));
+    var r=indexedDB.open('aerodocs-files',1);r.onupgradeneeded=function(){var db=r.result;if(!db.objectStoreNames.contains('files'))db.createObjectStore('files',{keyPath:'id'})};
+    r.onsuccess=function(){self.db=r.result;res(self.db)};r.onerror=function(){rej(r.error||new Error('IndexedDB open failed'))}})},
+  tx:function(mode,fn){return this.open().then(function(db){return new Promise(function(res,rej){var t=db.transaction('files',mode),q=fn(t.objectStore('files')),out;if(q)q.onsuccess=function(){out=q.result};t.oncomplete=function(){res(out)};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error||new Error('Storage full or blocked'))}})})},
+  put:function(r){return this.tx('readwrite',function(os){return os.put(r)})},
+  get:function(id){return this.tx('readonly',function(os){return os.get(id)})},
+  del:function(id){return this.tx('readwrite',function(os){return os.delete(id)})},
+  all:function(){return this.tx('readonly',function(os){return os.getAll()})},
+  clear:function(){return this.tx('readwrite',function(os){return os.clear()})}
+};
+var persistAsked=false;
+function askPersist(){if(persistAsked)return;persistAsked=true;try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}}
+async function getBlob(id){var r=await FS.get(id);return r?new Blob([r.buf],{type:r.type}):null}
+async function storeFile(prep,meta,docId){
+  var buf=await prep.blob.arrayBuffer();
+  await FS.put({id:meta.id,docId:docId,name:meta.name,type:meta.type,size:meta.size,created:meta.created,buf:buf});
+  askPersist();return meta;
+}
+async function applyRotation(meta,deg){
+  if(!deg||!/^image\//.test(meta.type))return;
+  try{var b=await getBlob(meta.id);if(!b)return;var L=await loadImage(b),c=rotateCanvas(drawScaled(L.im,2200,2200),deg);URL.revokeObjectURL(L.url);
+    var jb=await canvasBlob(c,'image/jpeg',0.86);var rec=await FS.get(meta.id);rec.buf=await jb.arrayBuffer();rec.size=jb.size;rec.type='image/jpeg';await FS.put(rec);
+    meta.size=jb.size;meta.thumb=drawScaled(c,240,240).toDataURL('image/jpeg',0.62);meta.rotated=(meta.rotated||0)+deg;
+  }catch(e){}
+}
+async function rekey(ids,docId){for(var i=0;i<ids.length;i++){var r=await FS.get(ids[i]);if(r){r.docId=docId;await FS.put(r)}}}
+
+/* ---------- libraries (self-hosted in the bundle; CDN only inside the Claude preview) ---------- */
+var CDN={
+  tess:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',pdf:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',pdfWorker:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',tessOpts:{}
+};
+var LIB=inFrame?CDN:{
+  tess:'tesseract.min.js',pdf:'pdf.min.js',pdfWorker:'pdf.worker.min.js',
+  tessOpts:{workerPath:'worker.min.js',corePath:'.',langPath:'.',workerBlobURL:false,gzip:true}
+};
+var scriptP={};
+function loadScript(src){if(scriptP[src])return scriptP[src];scriptP[src]=new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.async=true;s.onload=res;s.onerror=function(){delete scriptP[src];rej(new Error('Could not load '+src.split('/').pop()))};document.head.appendChild(s)});return scriptP[src]}
+async function libScript(key){try{await loadScript(LIB[key])}catch(e){if(LIB===CDN)throw e;LIB=CDN;await loadScript(LIB[key])}}
+async function ensurePdf(){if(!window.pdfjsLib)await libScript('pdf');window.pdfjsLib.GlobalWorkerOptions.workerSrc=LIB.pdfWorker;return window.pdfjsLib}
+async function openPdf(buf){var lib=await ensurePdf();return lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise}
+async function renderPage(page,maxW){var v1=page.getViewport({scale:1}),k=Math.min(3,maxW/v1.width),vp=page.getViewport({scale:k}),c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await page.render({canvasContext:x,viewport:vp}).promise;return c}
+var ocrW=null,ocrLang='',ocrP=null,onOcr=null;
+var OCR_STAGE={'loading tesseract core':'Loading OCR engine','initializing tesseract':'Starting OCR engine','loading language traineddata':'Loading language data','loading language traineddata (from cache)':'Loading language data','initializing api':'Preparing','recognizing text':'Reading text'};
+async function getWorker(){
+  var lang=S.settings.ocrArabic?'eng+ara':'eng';
+  if(ocrW&&ocrLang===lang)return ocrW;
+  if(ocrP&&ocrLang===lang)return ocrP;
+  if(!window.Tesseract)await libScript('tess');
+  if(ocrW){try{await ocrW.terminate()}catch(e){}ocrW=null}
+  ocrLang=lang;
+  ocrP=Tesseract.createWorker(lang,1,Object.assign({logger:function(m){if(onOcr)onOcr(OCR_STAGE[m.status]||m.status,m.progress)},errorHandler:function(){}},LIB.tessOpts))
+    .then(function(w){ocrW=w;ocrP=null;return w},function(e){ocrP=null;throw e});
+  return ocrP;
+}
+
+/* ---------- image helpers ---------- */
+function loadImage(blob){return new Promise(function(res,rej){var u=URL.createObjectURL(blob),im=new Image();im.onload=function(){res({im:im,url:u})};im.onerror=function(){URL.revokeObjectURL(u);rej(new Error('This image format could not be decoded'))};im.src=u})}
+function drawScaled(src,maxW,maxH){var w=src.naturalWidth||src.width,h=src.naturalHeight||src.height,k=Math.min(1,maxW/w,maxH/h),c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.drawImage(src,0,0,c.width,c.height);return c}
+function canvasBlob(c,type,q){return new Promise(function(res){c.toBlob(function(b){res(b)},type,q)})}
+function grayHist(c){var x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),p=d.data,h=new Array(256).fill(0),g;for(var i=0;i<p.length;i+=4){g=(p[i]*.299+p[i+1]*.587+p[i+2]*.114)|0;p[i]=g;h[g]++}return {x:x,d:d,p:p,h:h,n:p.length/4}}
+function enhance(src){var c=drawScaled(src,2600,2600),G=grayHist(c),lo=0,hi=255,acc=0,i;
+  for(i=0;i<256;i++){acc+=G.h[i];if(acc>G.n*0.01){lo=i;break}}acc=0;for(i=255;i>=0;i--){acc+=G.h[i];if(acc>G.n*0.01){hi=i;break}}
+  var r=Math.max(1,hi-lo);for(i=0;i<G.p.length;i+=4){var v=Math.max(0,Math.min(255,(G.p[i]-lo)*255/r));G.p[i]=G.p[i+1]=G.p[i+2]=v}G.x.putImageData(G.d,0,0);return c}
+function binarize(c){var G=grayHist(c),sum=0,sB=0,wB=0,max=0,th=127,i;for(i=0;i<256;i++)sum+=i*G.h[i];
+  for(i=0;i<256;i++){wB+=G.h[i];if(!wB)continue;var wF=G.n-wB;if(!wF)break;sB+=i*G.h[i];var mB=sB/wB,mF=(sum-sB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>max){max=v;th=i}}
+  for(i=0;i<G.p.length;i+=4){var g=G.p[i]>th?255:0;G.p[i]=G.p[i+1]=G.p[i+2]=g}G.x.putImageData(G.d,0,0);return c}
+function rotateCanvas(src,deg){if(!deg)return src;var c=document.createElement('canvas'),w=src.width,h=src.height;if(deg%180){c.width=h;c.height=w}else{c.width=w;c.height=h}var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.translate(c.width/2,c.height/2);x.rotate(deg*Math.PI/180);x.drawImage(src,-w/2,-h/2);return c}
+function ocrQual(res){var d=res&&res.data||{},ws=d.words||[];var n=ws.filter(function(w){return w.confidence>75&&/[A-Za-z0-9]{3,}/.test(w.text||'')}).length;if(!ws.length)n=Math.round((d.confidence||0)/10);if(findMRZ(d.text||''))n+=1000;return n}
+function cropBottom(src,frac){var w=src.width,h=src.height,top=Math.round(h*(1-frac)),sh=h-top,k=Math.min(2.2,2400/w),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(sh*k);var x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,top,w,sh,0,0,c.width,c.height);return c}
+
+/* ---------- ingest: file -> stored blob + thumbnail + OCR canvas ---------- */
+async function prepare(file){
+  var type=file.type||'',name=file.name||('scan-'+compact(todayN())+'.jpg');
+  if(file.size>25*1048576)throw new Error(name+' is larger than 25 MB');
+  var meta={id:'f'+uid().slice(1),name:name,type:type||'application/octet-stream',size:file.size,created:new Date().toISOString(),thumb:''};
+  var out={meta:meta,blob:file,ocr:null,pdfText:''};
+  if(/^image\//.test(type)||/\.(jpe?g|png|heic|heif|webp|gif)$/i.test(name)){
+    try{var L=await loadImage(file);
+      var st=drawScaled(L.im,2200,2200),jb=await canvasBlob(st,'image/jpeg',0.86);
+      if(jb&&(jb.size<file.size||!/jpe?g/i.test(type))){out.blob=jb;meta.type='image/jpeg';meta.size=jb.size;meta.name=name.replace(/\.[^.]+$/,'')+'.jpg'}
+      meta.thumb=drawScaled(L.im,240,240).toDataURL('image/jpeg',0.62);
+      out.ocr=drawScaled(L.im,2600,2600);URL.revokeObjectURL(L.url);
+    }catch(e){meta.note=e.message}
+  }else if(type==='application/pdf'||/\.pdf$/i.test(name)){
+    meta.type='application/pdf';
+    try{var pdf=await openPdf(await file.arrayBuffer());meta.pages=pdf.numPages;var pg=await pdf.getPage(1),c=await renderPage(pg,2200);
+      meta.thumb=drawScaled(c,240,240).toDataURL('image/jpeg',0.62);out.ocr=c;
+      var tc=await pg.getTextContent();out.pdfText=tc.items.map(function(i){return i.str+(i.hasEOL?'\n':' ')}).join('');
+    }catch(e){meta.note='PDF preview unavailable'}
+  }
+  return out;
+}
+async function prepFromStored(meta){var b=await getBlob(meta.id);if(!b)throw new Error('File data is missing on this device');var f=new File([b],meta.name,{type:meta.type});var p=await prepare(f);p.meta=meta;return p}
+
+/* ---------- detection: MRZ (ICAO 9303) ---------- */
+function mrzCV(c){if(c==='<')return 0;var n=c.charCodeAt(0);return n>=48&&n<=57?n-48:n>=65&&n<=90?n-55:0}
+function mrzCD(s){var w=[7,3,1],t=0;for(var i=0;i<s.length;i++)t+=mrzCV(s[i])*w[i%3];return t%10}
+function fixN(s){return String(s).replace(/[OQDU]/g,'0').replace(/[IL]/g,'1').replace(/Z/g,'2').replace(/S/g,'5').replace(/B/g,'8').replace(/G/g,'6').replace(/T/g,'7')}
+function okCD(field,c){c=fixN(c||'');return /^\d$/.test(c)&&mrzCD(field)===+c}
+function mkIso(y,m,d){y=+y;m=+m;d=+d;if(y<100)y+=2000;if(!(y>=1950&&y<=2100&&m>=1&&m<=12&&d>=1))return null;if(d>new Date(Date.UTC(y,m,0)).getUTCDate())return null;return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
+function mrzDate(s,exp){s=fixN(s);if(!/^\d{6}$/.test(s))return '';var y=+s.slice(0,2),cy=new Date().getFullYear()%100;return mkIso(exp?2000+y:(y>cy?1900+y:2000+y),s.slice(2,4),s.slice(4,6))||''}
+function docNum(raw,c){if(okCD(raw,c))return {v:raw,ok:true};var f=fixN(raw);if(okCD(f,c))return {v:f,ok:true};return {v:raw,ok:false}}
+function fit(l,n){return (l+new Array(n+1).join('<')).slice(0,n)}
+function mrzNames(seg){var p=String(seg||'').split('<<'),sur=(p[0]||'').replace(/</g,' ').trim(),giv=p.slice(1).join(' ').replace(/</g,' ').replace(/\s+/g,' ').trim();return (giv+' '+sur).trim()}
+function mrz2(l1,l2,fmt){var num=docNum(l2.slice(0,9),l2[9]),dob=l2.slice(13,19),exp=l2.slice(21,27);
+  var r={fmt:fmt,holder:mrzNames(l1.slice(5)),code:l1.slice(0,2).replace(/<+$/,''),issuer:l1.slice(2,5).replace(/</g,''),number:num.v.replace(/</g,''),numberOK:num.ok,dob:mrzDate(dob,false),expiry:mrzDate(exp,true),checks:{number:num.ok,dob:okCD(fixN(dob),l2[19]),expiry:okCD(fixN(exp),l2[27])}};
+  r.score=(r.checks.number?1:0)+(r.checks.dob?1:0)+(r.checks.expiry?2:0);return r}
+function mrzTD1(l1,l2,l3){var num=docNum(l1.slice(5,14),l1[14]),dob=l2.slice(0,6),exp=l2.slice(8,14);
+  var r={fmt:'TD1',holder:mrzNames(l3||''),code:l1.slice(0,2).replace(/<+$/,''),issuer:l1.slice(2,5).replace(/</g,''),number:num.v.replace(/</g,''),numberOK:num.ok,dob:mrzDate(dob,false),expiry:mrzDate(exp,true),checks:{number:num.ok,dob:okCD(fixN(dob),l2[6]),expiry:okCD(fixN(exp),l2[14])}};
+  r.score=(r.checks.number?1:0)+(r.checks.dob?1:0)+(r.checks.expiry?2:0);return r}
+function findMRZ(text){
+  var ls=String(text||'').toUpperCase().split(/\n+/).map(function(l){return l.replace(/[«‹]/g,'<').replace(/\s+/g,'').replace(/[^A-Z0-9<]/g,'')}).filter(function(l){return l.length>=26});
+  var best=null;function cand(r){if(r&&r.expiry&&(!best||r.score>best.score))best=r}
+  for(var i=0;i<ls.length;i++){var a=ls[i],b=ls[i+1]||'';
+    if(/^[PV][A-Z0-9<]/.test(a)&&b.length>=40)cand(mrz2(fit(a,44),fit(b,44),a[0]==='V'?'MRV-A':'TD3'));
+    if(/^[PVIAC][A-Z0-9<]/.test(a)&&b.length>=32&&b.length<40)cand(mrz2(fit(a,36),fit(b,36),a[0]==='V'?'MRV-B':'TD2'));
+    if(/^[IAC][A-Z0-9<]/.test(a)&&a.length<=34&&b.length>=26)cand(mrzTD1(fit(a,30),fit(b,30),fit(ls[i+2]||'',30)));
+  }
+  return best&&best.score>=2?best:null;
+}
+var COUNTRY={OMN:'Oman',ARE:'UAE',LBY:'Libya',SAU:'Saudi Arabia',QAT:'Qatar',KWT:'Kuwait',BHR:'Bahrain',EGY:'Egypt',JOR:'Jordan',TUN:'Tunisia',DZA:'Algeria',MAR:'Morocco',GBR:'United Kingdom',USA:'USA',IND:'India',PAK:'Pakistan',PHL:'Philippines',D:'Germany',FRA:'France',ITA:'Italy',ESP:'Spain',TUR:'Türkiye',CAN:'Canada',AUS:'Australia',IRL:'Ireland',NLD:'Netherlands',SDN:'Sudan',SYR:'Syria',LBN:'Lebanon',YEM:'Yemen'};
+
+/* ---------- detection: text classifier + dates ---------- */
+var CLASS=[
+ ['ppt',[['passport',3],['جواز',3],['passeport',3],['p<',2]]],
+ ['visa',[['residence permit',3],['entry permit',3],['visa',2],['تأشيرة',3],['إقامة',2],['اقامة',2],['residence',1]]],
+ ['id',[['identity card',3],['resident card',3],['resident',2],['vil number',2],['vilnumber',2],['id card',2],['بطاقة',2],['emirates id',3],['civil number',2],['الرقم المدني',3]]],
+ ['med1',[['medical certificate',3],['class 1',3],['class i ',2],['aeromedical',3],['aero-medical',3],['medical examiner',3],['limitations',1],['medical',1]]],
+ ['lic',[['flight crew licence',3],['flight crew license',3],['airline transport pilot',3],['atpl',2],['commercial pilot',2],['licence holder',1],['ratings',1]]],
+ ['lpc',[['licence proficiency check',4],['license proficiency check',4],['proficiency check',2],['skill test',2],['type rating',2],['lpc',2]]],
+ ['opc',[['operator proficiency check',4],['opc',2]]],
+ ['line',[['line check',4]]],
+ ['crm',[['crew resource management',4],['crm',2]]],
+ ['sep',[['safety and emergency',4],['emergency procedures',3]]],
+ ['dg',[['dangerous goods',4],['dgr',2]]],
+ ['sec',[['security pass',3],['airport pass',3],['airside',2],['access permit',2]]],
+ ['dl',[['driving licence',4],['driving license',4],['driver license',3],['driving',2],['رخصة قيادة',4],['رخصة سياقة',4],['traffic',1]]],
+ ['mlk',[['vehicle registration',3],['mulkiya',4],['ملكية',3],['chassis',3],['رخصة مركبة',3],['plate',1],['engine',1],['vehicle',1]]],
+ ['ins',[['insurance',3],['policy no',2],['policy number',2],['insured',2],['تأمين',3],['premium',1]]]
+];
+function classify(text){var l=String(text||'').toLowerCase().replace(/\s+/g,' '),best=null,bs=0;
+  CLASS.forEach(function(c){var s=0;c[1].forEach(function(k){var i=-1,n=0;while(n<3&&(i=l.indexOf(k[0],i+1))>-1)n++;s+=n*k[1]});if(s>bs){bs=s;best=c[0]}});
+  return {k:bs>=2?best:null,s:bs}}
+var EXP_KW=['expiry','expiration','expires','expire','exp.','exp:','exp ','valid until','valid till','valid to','valid thru','validity','until','تاريخ الانتهاء','الانتهاء','انتهاء','تنتهي','ينتهي','صالح حتى','صالحة حتى','لغاية'];
+var NEG_KW=['birth','dob','born','issue','issued','grant','printed','use by','valid from','date of exam','examination','تاريخ الميلاد','الميلاد','الإصدار','الاصدار','اصدار'];
+function lastHit(s,kws){var b=-1;kws.forEach(function(k){var i=s.lastIndexOf(k);if(i>b)b=i});return b}
+function firstHit(s,kws){var b=-1;kws.forEach(function(k){var i=s.indexOf(k);if(i>-1&&(b<0||i<b))b=i});return b}
+var MONMAP={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,SEPT:9,OCT:10,NOV:11,DEC:12};
+function normDigits(s){return String(s||'').replace(/[٠-٩]/g,function(c){return String(c.charCodeAt(0)-0x660)}).replace(/[۰-۹]/g,function(c){return String(c.charCodeAt(0)-0x6F0)})}
+function findDates(text,preset){
+  var T=normDigits(text),U=T.toUpperCase(),Lw=T.toLowerCase(),out=[],seen={},m,re,t=todayN();
+  function add(iso,idx,len){if(!iso)return;var k=iso+'@'+Math.round(idx/6);if(seen[k])return;seen[k]=1;out.push({iso:iso,idx:idx,len:len})}
+  re=/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[1],m[2],m[3]),m.index,m[0].length);
+  re=/(^|\D)(\d{1,2})\s?[\/\-.]\s?(\d{1,2})\s?[\/\-.]\s?(\d{4}|\d{2})(?!\d)/g;
+  while((m=re.exec(U))){var a=+m[2],b=+m[3],dd=a,mm=b;if(a<=12&&b>12){mm=a;dd=b}add(mkIso(m[4],mm,dd),m.index+m[1].length,m[0].length-m[1].length)}
+  re=/(^|\D)(\d{2}) (\d{2}) (\d{4})(?!\d)/g;while((m=re.exec(U)))add(mkIso(m[4],m[3],m[2]),m.index+m[1].length,m[0].length-m[1].length);
+  re=/(^|[^\dA-Z])(\d{1,2})[\s\-.\/]*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEPT|SEP|OCT|NOV|DEC)[A-Z]*\.?[\s\-.\/,]*(\d{4}|\d{2})(?!\d)/g;
+  while((m=re.exec(U)))add(mkIso(m[4],MONMAP[m[3]],m[2]),m.index+m[1].length,m[0].length-m[1].length);
+  re=/(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEPT|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{1,2}),?\s+(\d{4})/g;while((m=re.exec(U)))add(mkIso(m[3],MONMAP[m[1]],m[2]),m.index,m[0].length);
+  out.forEach(function(o){
+    var n=isoN(o.iso),pre=Lw.slice(Math.max(0,o.idx-70),o.idx),post=Lw.slice(o.idx+o.len,o.idx+o.len+30),e=lastHit(pre,EXP_KW),g=lastHit(pre,NEG_KW),s=0,lab='';
+    if(e>-1&&e>=g){s+=10;lab='expiry label'}else if(g>-1){s-=8;lab='issue/birth label'}
+    else{if(firstHit(post,EXP_KW)>-1){s+=6;lab='expiry label'}else if(firstHit(post,NEG_KW)>-1){s-=5;lab='issue/birth label'}}
+    if(preset==='med1'&&/class\s*(1|i)\b/.test(pre.slice(-40))){s+=6;lab=lab||'class 1'}
+    var near=pre.slice(-60);
+    if(preset!=='ppt'&&/travel document|passport|جواز/.test(near)&&/expir|انتهاء/.test(near)){s-=12;lab='passport expiry'}
+    if((preset==='visa'||preset==='id')&&/(visa|card|permit|residen)[^\n]{0,8}expir|تاريخ انتهاء التأشيرة|انتهاء التأشيرة/.test(near))s+=4;
+    if(n>=t)s+=3;else s-=1;if(n-t>365*15)s-=4;if(n<t-365*20)s-=6;
+    o.n=n;o.score=s;o.label=lab;
+  });
+  out.sort(function(a,b){return b.score-a.score||b.n-a.n});
+  return out;
+}
+var AC_RE=/\b(A3[1-5]\d|A220|A330|A350|A380|B7[0-9]7|B737|ATR ?72|E1[79]0|E19[05]|Q400)\b/i;
+function analyse(text,mrz,method){
+  var t=todayN(),r={preset:null,name:'',expiry:'',issue:'',ref:'',issuer:'',method:method,conf:'none',cands:[],text:String(text||''),mrz:mrz||null};
+  if(mrz){var c=mrz.code[0],cn=COUNTRY[mrz.issuer]||mrz.issuer;
+    r.preset=c==='P'?'ppt':c==='V'?'visa':'id';r.name=(c==='P'?'Passport':c==='V'?'Visa':'ID / Resident Card')+(cn?' ('+cn+')':'');
+    r.expiry=mrz.expiry;r.ref=mrz.numberOK?mrz.number:'';r.issuer=cn;r.method='mrz';r.conf=mrz.checks.expiry?'high':'medium'}
+  if(!r.preset)r.preset=classify(text).k;
+  var ds=findDates(text,r.preset);
+  if(mrz&&mrz.expiry){ds=ds.filter(function(d){return d.iso!==mrz.expiry});ds.unshift({iso:mrz.expiry,n:isoN(mrz.expiry),label:'MRZ',score:99})}
+  var seenC={};r.cands=ds.filter(function(d){if(seenC[d.iso])return false;seenC[d.iso]=1;return true}).slice(0,6);
+  if(!r.expiry&&ds.length){r.expiry=ds[0].iso;r.conf=ds[0].label==='expiry label'||ds[0].label==='class 1'?'medium':'low'}
+  if(!mrz){var iss=ds.filter(function(d){return d.label==='issue/birth label'&&d.n<=t&&d.n>t-365*11}).sort(function(a,b){return b.n-a.n})[0];if(iss)r.issue=iss.iso}
+  if(r.preset&&!r.name){var p=presetBy(r.preset)||{};r.name=p.name||'';var ac=(String(text).match(AC_RE)||[])[0];
+    if(ac&&/^(lpc|opc|line)$/.test(r.preset))r.name=ac.toUpperCase().replace(' ','')+' '+(r.preset==='lpc'?'Type Rating LPC':r.preset==='opc'?'OPC':'Line Check')}
+  var L=r.text.toLowerCase().replace(/\s+/g,' ');
+  var iss=/\bof oman\b|royal oman police|سلطنة عمان/.test(L)?'Oman':/united arab emirates|الإمارات/.test(L)?'UAE':/state of libya|دولة ليبيا/.test(L)?'Libya':/kingdom of saudi|السعودية/.test(L)?'Saudi Arabia':'';
+  if(!r.issuer&&iss)r.issuer=iss;
+  if(!mrz&&r.preset==='id'&&(/resident\b[\s\S]{0,40}\bcard|بطاقة مقيم/.test(L)))r.name=(iss?iss+' ':'')+'Resident Card';
+  else if(!mrz&&r.preset==='id'&&iss)r.name=iss+' ID Card';
+  if(!mrz&&r.preset==='visa'){var vt=/relative joining|التحاق بالأقارب/.test(L)?'Relative Joining Visa':/employment|work visa|عمل/.test(L)?'Employment Visa':/residen/.test(L)?'Residence Visa':/visit|tourist|سياحة/.test(L)?'Visit Visa':'Visa';
+    var vc=(r.text.match(/\b(\d{1,2}[A-Z])\b\s*\n?\s*(?:relative|employment|visa)/i)||[])[1];r.name=vt+(vc?' '+vc.toUpperCase():'')+(iss?' ('+iss+')':'')}
+  if(!r.ref){var mref=normDigits(r.text).match(r.preset==='visa'?/visa\s*(?:number|no\.?)[^\d]{0,40}(\d{6,})/i:r.preset==='id'?/civil\s*(?:number|no\.?)[^\d]{0,40}(\d{6,})/i:/(?:licen[cs]e|policy|card|reg(?:istration)?)\s*(?:number|no\.?)\s*[:#]?\s*([A-Z0-9\-]{5,})/i);if(mref)r.ref=mref[1]}
+  if(!r.text.trim()&&!mrz)r.conf='none';
+  return r;
+}
+async function detectFrom(prep,onP){
+  var text=prep.pdfText||'',method='pdf-text',mrz=null;
+  if(text.replace(/\s/g,'').length<60){
+    text='';method='ocr';
+    if(!prep.ocr)return analyse('',null,'none');
+    onOcr=onP;onP('Loading OCR engine',0);
+    try{var w=await getWorker(),base=prep.ocr,rot=0;
+      var res=await w.recognize(enhance(base));text=res.data.text||'';
+      mrz=findMRZ(text);
+      if(!mrz&&(ocrQual(res)<25||!findDates(text).length)){
+        var small=drawScaled(base,1500,1500),best={deg:0,q:-1};
+        for(var di=0;di<4;di++){var deg=[0,180,90,270][di];onP('Checking orientation',di/4);
+          var rq=ocrQual(await w.recognize(enhance(rotateCanvas(small,deg))));if(rq>best.q)best={deg:deg,q:rq}}
+        if(best.deg){rot=best.deg;base=rotateCanvas(base,rot);onP('Reading text',0);res=await w.recognize(enhance(base));text=res.data.text||'';mrz=findMRZ(text)}
+      }
+      prep.ocr=base;prep.rotation=rot;
+      if(!mrz&&(/<</.test(text)||/passport|جواز|visa|identity|resident|p</i.test(text)||text.replace(/\s/g,'').length<40)){
+        onP('Checking machine-readable zone',0);
+        await w.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',tessedit_pageseg_mode:'6'});
+        try{var r2=await w.recognize(binarize(cropBottom(prep.ocr,0.45)));mrz=findMRZ(r2.data.text);if(mrz)text+='\n'+r2.data.text}
+        finally{await w.setParameters({tessedit_char_whitelist:'',tessedit_pageseg_mode:'3'})}
+      }
+    }finally{onOcr=null}
+  }else mrz=findMRZ(text);
+  var out=analyse(text,mrz,method);out.rotation=prep.rotation||0;return out;
+}
+function ocrErrMsg(e){return inFrame?'Text recognition cannot run inside the Claude preview. The file is attached; enter the details, or use the hosted copy.':('Text recognition failed: '+(e&&e.message||e)+'. The file is attached; enter the details manually.')}
+
+/* ---------- detection result in the editor ---------- */
+function applyDetection(r){
+  if(!ED||!$('#docForm'))return;ED.det=r;
+  var famO=$('#fOwner')&&$('#fOwner').value;
+  if(r.preset&&!(famO&&AV_ONLY[r.preset])&&(ED.isNew||!$('#fPreset').value)){$('#fPreset').value=r.preset;applyPreset(presetBy(r.preset))}
+  if(r.name&&(ED.isNew||!$('#fName').value.trim()))$('#fName').value=r.name;
+  if(r.expiry)$('#fExp').value=r.expiry;
+  if(r.issue&&!$('#fIssue').value)$('#fIssue').value=r.issue;
+  if(r.ref&&!$('#fRef').value)$('#fRef').value=r.ref;
+  if(r.issuer&&!$('#fAuth').value)$('#fAuth').value=r.issuer;
+  renderDet();
+}
+function renderDet(){
+  var r=ED&&ED.det,el=$('#detBox');if(!el)return;if(!r){el.hidden=true;return}el.hidden=false;
+  var pn=(presetBy(r.preset)||{}).name||'Unknown type',cur=$('#fExp').value;
+  var head={high:'Read from the passport/ID machine-readable zone. Check digits verified.',medium:r.method==='mrz'?'Read from the machine-readable zone, but a check digit failed. Verify the date.':'Expiry found next to an expiry label. Verify before saving.',low:'No expiry label found. Best guess selected; tap the correct date below.',none:'No readable text found. Enter the details manually.'}[r.conf];
+  var src={mrz:'MRZ',ocr:'Photo OCR','pdf-text':'PDF text',none:'—'}[r.method]||r.method;
+  var chg=ED.orig&&cur&&cur!==ED.orig?'<div>Expiry update: <span class="mono">'+fmt(ED.orig)+'</span> → <b class="mono">'+fmt(cur)+'</b> (previous date kept in history)</div>':'';
+  el.className='det '+r.conf;
+  el.innerHTML='<div class="det-h"><span class="pill '+(r.conf==='high'?'ok':r.conf==='none'?'neutral':'warn')+'"><span class="dot"></span>'+esc(src)+'</span>Detected: '+esc(r.preset?pn:'Unknown type')+'</div><div>'+head+'</div>'+chg+
+   (r.cands.length?'<div class="lbl-t">Dates found — tap to set expiry</div><div class="dchips">'+r.cands.map(function(c){return '<button type="button" class="dchip" data-act="pick-date" data-iso="'+c.iso+'" aria-pressed="'+(c.iso===cur)+'">'+fmt(c.iso)+(c.label?'<small>'+esc({'expiry label':'labelled expiry','issue/birth label':'issue / birth','class 1':'Class 1'}[c.label]||c.label)+'</small>':'')+'</button>'}).join('')+'</div>':'')+
+   (r.text.trim()?'<details><summary>Recognised text</summary><pre>'+esc(r.text.slice(0,2500))+'</pre></details>':'');
+}
+function edProgress(label,p){var el=$('#detBox');if(!el)return;el.hidden=false;el.className='det none';
+  el.innerHTML='<div class="det-h">'+esc(label)+(p>0&&p<1?' · '+Math.round(p*100)+'%':'')+'</div><div class="bar"><span style="width:'+Math.round((p||0)*100)+'%"></span></div>'}
+async function editorAddFiles(list){
+  if(!ED)return;var files=Array.prototype.slice.call(list||[]),first=null;
+  for(var i=0;i<files.length;i++){
+    try{edProgress('Adding '+files[i].name,0);var p=await prepare(files[i]);await storeFile(p,p.meta,ED.id);
+      if(!ED)return;ED.files.push(p.meta);ED.added.push(p.meta.id);if(!first&&p.ocr)first=p;renderEdFiles()}
+    catch(e){toast(e.message||'Could not add file')}
+  }
+  renderDet();
+  if(first&&!$('#fExp').value)await editorScan(first);
+  else if(first)toast('File attached. Tap it and choose Read to scan.');
+}
+async function editorScan(prep){
+  try{var r=await detectFrom(prep,edProgress);if(r.rotation){await applyRotation(prep.meta,r.rotation);renderEdFiles()}if(ED)applyDetection(r)}
+  catch(e){if(ED){ED.det=null;renderDet()}toast(ocrErrMsg(e))}
+}
+
+/* ---------- scan flow: new document or renewal of an existing one ---------- */
+var SCAN=null,SCAN_CTX={owner:''};
+function scanSheet(){
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Scan a document</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<p class="muted">AeroDocs reads the document on this device, identifies the type and finds the expiry date. The image or PDF is attached to the record.</p>'+
+   '<div class="scan-opts"><label class="btn primary big" for="scanCam">'+IC.cam+'Take photo</label><label class="btn big" for="scanPick">'+IC.up+'Photo, PDF or file</label></div>'+
+   '<ul class="tips"><li>Lay the document flat in good light and fill the frame.</li><li>Passport: include the two lines of &lt;&lt;&lt; characters at the bottom of the photo page.</li><li>ID or residence card: scan the side with the three &lt;&lt;&lt; lines.</li><li>Medical certificates and check forms: the emailed PDF reads best.</li><li>Scanning a renewed document offers to update the existing record.</li></ul>');
+}
+function progSheet(){
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Reading document</h3></div><div class="scan-prog"><img id="spThumb" alt="" hidden><div style="flex:1;min-width:0"><div id="spStage" class="muted">Preparing file</div><div class="bar"><span id="spBar"></span></div></div></div><div class="sheet-f"><button class="btn" data-act="scan-cancel">Cancel</button></div>');
+}
+function spSet(label,p){var a=$('#spStage'),b=$('#spBar');if(a)a.textContent=label+(p>0&&p<1?' · '+Math.round(p*100)+'%':'');if(b)b.style.width=Math.round((p||0)*100)+'%'}
+async function scanNew(list){
+  var files=Array.prototype.slice.call(list||[]);if(!files.length)return;var ctx=SCAN_CTX||{owner:''};
+  var job={docId:uid(),cancel:false,metas:[]};SCAN=job;progSheet();
+  var r=null,primary=null;
+  try{
+    for(var i=0;i<files.length;i++){spSet('Preparing '+files[i].name,0);var p=await prepare(files[i]);if(job.cancel)break;
+      await storeFile(p,p.meta,job.docId);job.metas.push(p.meta);if(!primary&&p.ocr)primary=p;
+      if(p.meta.thumb&&$('#spThumb')){$('#spThumb').src=p.meta.thumb;$('#spThumb').hidden=false}}
+    if(!job.cancel&&primary){try{r=await detectFrom(primary,spSet);if(r.rotation){spSet('Straightening image',0.9);await applyRotation(primary.meta,r.rotation)}}catch(e){toast(ocrErrMsg(e));r=analyse('',null,'none')}}
+  }catch(e){toast(e.message||'Could not read the file')}
+  if(job.cancel||SCAN!==job){job.metas.forEach(function(m){FS.del(m.id).catch(function(){})});return}
+  SCAN=null;
+  if(!job.metas.length){closeSheet();return}
+  r=r||analyse('',null,'none');
+  var nr=function(s){return String(s||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()};
+  var owner=ctx.owner,hm=matchMember(r);
+  if(hm&&!ctx.fixed)owner=hm;
+  if(owner==null)owner=S.family.length?S.family[0].id:'';
+  var hits=S.docs.filter(function(d){return (r.ref&&d.ref&&nr(d.ref)===nr(r.ref))||(r.preset&&r.preset!=='custom'&&d.preset===r.preset&&(d.owner||'')===(owner||''))}).slice(0,4);
+  if(!hits.length){sheetCloseCb=null;editor(null,{id:job.docId,owner:owner,files:job.metas,detect:r});return}
+  var ids=job.metas.map(function(m){return m.id}),picked=false;
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Renewal or new document?</h3></div>'+
+   '<p class="muted">This looks like <b>'+esc((presetBy(r.preset)||{}).name||'a tracked document')+'</b>'+(r.expiry?', expiring <b class="mono">'+fmt(r.expiry)+'</b>':'')+'. Update an existing record or add a new one.</p>'+
+   '<div class="gcal-list" style="margin-top:12px">'+hits.map(function(d){return '<button class="btn" style="justify-content:space-between;white-space:normal;text-align:left" data-act="scan-update" data-id="'+d.id+'"><span>Update <b>'+esc(docLabel(d))+'</b></span><span class="mono">'+fmt(d.expiry)+(r.expiry?' → '+fmt(r.expiry):'')+'</span></button>'}).join('')+
+   '<button class="btn primary" data-act="scan-asnew">Add as new document</button></div><div class="sheet-f"><button class="btn" data-act="close">Cancel</button></div>',
+   function(){if(!picked)ids.forEach(function(id){FS.del(id).catch(function(){})})});
+  SCAN={pending:true,docId:job.docId,owner:owner,metas:job.metas,r:r,pick:function(){picked=true}};
+}
+
+/* ---------- file viewer (second layer) ---------- */
+var VW=null;
+function kb(n){n=+n||0;return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
+function viewer(list,idx,ctx){VW={list:list,idx:idx,ctx:ctx,url:null};$('#scrim2').hidden=false;drawViewer()}
+function closeViewer(){if(VW&&VW.url)URL.revokeObjectURL(VW.url);VW=null;$('#scrim2').hidden=true;$('#sheet2').innerHTML=''}
+async function drawViewer(){
+  if(!VW)return;var v=VW,m=v.list[v.idx];if(!m){closeViewer();return}
+  if(v.url){URL.revokeObjectURL(v.url);v.url=null}
+  var n=v.list.length,ty=(m.type.split('/')[1]||'file').toUpperCase();
+  $('#sheet2').innerHTML='<div class="sheet-h"><div style="min-width:0"><h3 style="overflow-wrap:anywhere">'+esc(m.name)+'</h3><div class="note mono">'+esc(ty)+' · '+kb(m.size)+(m.pages?' · '+m.pages+' page'+(m.pages>1?'s':''):'')+' · '+fmt((m.created||'').slice(0,10))+'</div></div><button class="icon-btn" data-act="vw-close" aria-label="Close">✕</button></div>'+
+   '<div class="vw-stage" id="vwStage"><span class="muted">Loading</span></div><div id="vwConfirm" style="margin-top:10px"></div>'+
+   '<div class="sheet-f">'+(n>1?'<button class="btn sm" data-act="vw-prev"'+(v.idx===0?' disabled':'')+'>Previous</button><span class="note mono" style="align-self:center">'+(v.idx+1)+' / '+n+'</span><button class="btn sm" data-act="vw-next" style="margin-right:auto"'+(v.idx===n-1?' disabled':'')+'>Next</button>':'')+
+   (v.ctx==='editor'?'<button class="btn sm danger" data-act="vw-remove">Remove</button><button class="btn sm" data-act="vw-read">Read this file</button>':'')+
+   '<a class="btn sm" id="vwOpen" target="_blank" rel="noopener" href="#" hidden>Open</a><button class="btn sm primary" data-act="vw-share">Share / Save</button></div>';
+  var stage=$('#vwStage'),b=null;
+  try{b=await getBlob(m.id)}catch(e){}
+  if(VW!==v)return;
+  if(!b){stage.innerHTML='<p class="muted" style="padding:20px;text-align:center">File data is missing on this device.'+(m.thumb?'</p><img src="'+m.thumb+'" alt="">':'</p>');return}
+  v.url=URL.createObjectURL(b);var op=$('#vwOpen');op.href=v.url;op.hidden=false;
+  if(/^image\//.test(m.type)){stage.innerHTML='<img src="'+v.url+'" alt="'+esc(m.name)+'">'}
+  else if(/pdf/.test(m.type)){try{var pdf=await openPdf(await b.arrayBuffer()),c=await renderPage(await pdf.getPage(1),1600);if(VW!==v)return;stage.innerHTML='';stage.appendChild(c)}catch(e){stage.innerHTML=m.thumb?'<img src="'+m.thumb+'" alt="">':'<p class="muted">Preview unavailable. Use Open.</p>'}}
+  else stage.innerHTML='<p class="muted" style="padding:20px">No preview for this file type. Use Open or Share.</p>';
+}
+async function shareFile(m){
+  var b=await getBlob(m.id);if(!b){toast('File data is missing');return}
+  var f=new File([b],m.name,{type:m.type});
+  if(!inFrame&&navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:m.name})}catch(e){}return}
+  if(inFrame){toast('Sharing is blocked in the Claude preview. Use Open.');return}
+  var u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=m.name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},5000);
+}
+
+/* ---------- backup with files ---------- */
+function bufToB64(buf){var b=new Uint8Array(buf),s='',CH=0x8000;for(var i=0;i<b.length;i+=CH)s+=String.fromCharCode.apply(null,b.subarray(i,i+CH));return btoa(s)}
+function b64ToBuf(b64){var s=atob(b64),b=new Uint8Array(s.length);for(var i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return b.buffer}
+function fileStats(){var n=0,sz=0;S.docs.forEach(function(d){(d.files||[]).forEach(function(f){n++;sz+=f.size||0})});return {n:n,sz:sz}}
+function exportSheet(){
+  var st=fileStats();
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Export backup</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<p class="muted">Saves '+S.docs.length+' documents, '+S.family.length+' family members and your settings as a .json file. The relay token is never exported.</p>'+
+   '<label class="check" style="margin-top:10px"><input type="checkbox" id="exFiles"'+(st.n?' checked':' disabled')+'> Include '+st.n+' attached file'+(st.n===1?'':'s')+' ('+kb(st.sz)+')</label>'+
+   '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="exGo">Export</button></div>');
+  $('#exGo').onclick=async function(){var wf=$('#exFiles').checked;this.disabled=true;
+    try{var data={app:'AeroDocs',ver:VER,exported:new Date().toISOString(),docs:S.docs,family:S.family,settings:S.settings,email:Object.assign({},S.email,{relayToken:''})};
+      if(wf){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});var all=await FS.all();
+        data.files=all.filter(function(r){return keep[r.id]}).map(function(r){return {id:r.id,docId:r.docId,name:r.name,type:r.type,size:r.size,created:r.created,b64:bufToB64(r.buf)}})}
+      closeSheet();deliver('aerodocs-backup-'+compact(todayN())+(wf?'-with-files':'')+'.json','application/json',JSON.stringify(data,null,wf?0:2));
+    }catch(e){this.disabled=false;toast('Export failed: '+(e.message||e))}};
+}
+
+/* ---------- sample data ---------- */
+function sampleDocs(){
+  var base=[
+   ['med1','Medical Class 1','Aviation','MED','Aviation Medical Examiner','','2025-11-02',12,false,'2026-11-02',45,45,true,'AME appointment needed. Bring last ECG and audiogram.'],
+   ['lic','ATPL(A) Licence','Aviation','LIC','CAA','ATPL-2087','2025-04-11',60,false,'2030-04-11',90,0,true,''],
+   ['lpc','A320 Type Rating LPC','Aviation','LPC','Operator / TRE','','2026-03-14',12,true,'2027-03-31',60,90,true,'Sim slot to be requested from crew scheduling.'],
+   ['opc','A320 OPC','Aviation','OPC','Operator / TRE','','2026-04-22',6,true,'2026-10-31',45,90,true,'Combined with LPC cycle next year.'],
+   ['lpc','B777 Type Rating LPC','Aviation','LPC','TRE','','2026-06-09',12,true,'2027-06-30',60,90,false,'Secondary rating, not currently operated.'],
+   ['line','Line Check A320','Aviation','LC','Operator / LTC','','2026-05-18',12,true,'2027-05-31',45,90,true,''],
+   ['crm','CRM Recurrent','Aviation','CRM','Operator','','2026-02-03',12,true,'2027-02-28',30,0,true,''],
+   ['sep','SEP / Emergency Procedures','Aviation','SEP','Operator','','2026-01-12',12,true,'2027-01-31',30,90,true,''],
+   ['dg','Dangerous Goods','Aviation','DG','Operator','','2025-09-16',24,true,'2027-09-30',30,90,true,''],
+   ['ppt','Passport','Aviation','PPT','Passport authority','P0004417','2017-03-20',120,false,'2027-03-20',180,0,true,'Inside the 6-month entry rule from Sep 2026. Start renewal.'],
+   ['visa','UAE Residence Visa','Aviation','VISA','ICP UAE','','2024-09-30',24,false,'2026-09-30',30,0,false,'Lapsed. Renew or cancel.'],
+   ['sec','Airport Security Pass','Aviation','SEC','Airport Authority','','2025-12-31',12,false,'2026-12-31',30,0,true,''],
+   ['dl','Oman Driving Licence','Personal','DL','ROP','','2021-06-15',120,false,'2031-06-15',30,0,false,''],
+   ['dl','UAE Driving Licence','Personal','DL','RTA / Police','','2021-12-20',60,false,'2026-12-20',30,0,false,''],
+   ['mlk','Vehicle Registration (Mulkiya)','Personal','MLK','ROP','','2025-11-04',12,false,'2026-11-04',30,0,false,'Renew insurance first, then Mulkiya.'],
+   ['ins','Vehicle Insurance','Personal','INS','Insurer','','2025-11-04',12,false,'2026-11-04',30,0,false,'Comprehensive. Compare quotes.']
+  ];
+  return base.map(function(r){return {id:uid(),preset:r[0],name:r[1],category:r[2],code:r[3],authority:r[4],ref:r[5],issue:r[6],validity:String(r[7]),eom:r[8],expiry:r[9],threshold:r[10],window:r[11],critical:r[12],notes:r[13],sample:true,updated:new Date().toISOString()}});
+}
+
+/* ---------- email ---------- */
+function emailCfgOK(){var e=S.email;if(e.provider==='off')return 'Choose a provider first.';if(!/^\S+@\S+\.\S+$/.test(e.to))return 'Enter a valid recipient email.';
+  if(e.provider==='emailjs'&&(!e.ejsService||!e.ejsTemplate||!e.ejsPublic))return 'Fill EmailJS Service ID, Template ID and Public Key.';
+  if(e.provider==='resend'&&(!/^https:\/\//.test(e.relayUrl)||!e.relayToken))return 'Enter an HTTPS relay URL and token.';return ''}
+function sendEmail(subject,text){
+  var e=S.email;
+  if(e.provider==='emailjs')return fetch('https://api.emailjs.com/api/v1.0/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service_id:e.ejsService,template_id:e.ejsTemplate,user_id:e.ejsPublic,template_params:{to_email:e.to,subject:subject,message:text,app:'AeroDocs v'+VER}})})
+    .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error('EmailJS '+r.status+': '+t)})});
+  return fetch(e.relayUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:e.relayToken,to:e.to,subject:subject,text:text})})
+    .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error('Relay '+r.status+': '+t.slice(0,200))})});
+}
+function logIt(m){S.log.unshift({t:new Date().toISOString().slice(0,16).replace('T',' '),m:m});S.log=S.log.slice(0,50);save()}
+function collectDue(){
+  var e=S.email,ms=e.milestones.slice().sort(function(a,b){return a-b}),due=[];
+  S.docs.forEach(function(d){var i=info(d);if(isNaN(i.days))return;var base=d.id+'|'+d.expiry+'|';
+    if(i.days<0){if(e.expired&&!S.sent[base+'X'])due.push({d:d,i:i,keys:[base+'X'],tag:'EXPIRED'});return}
+    var hit=ms.filter(function(m){return i.days<=m})[0];if(hit==null)return;
+    if(!S.sent[base+hit])due.push({d:d,i:i,keys:ms.filter(function(m){return m>=hit}).map(function(m){return base+m}),tag:hit+'-day'});
+  });
+  return due;
+}
+function runCheck(manual){
+  var msg=emailCfgOK();if(msg){if(manual)toast(msg);return Promise.resolve()}
+  var due=collectDue();
+  if(!due.length){if(manual)toast('No new milestones to email');S.lastAuto=Date.now();save();renderEmail();return Promise.resolve()}
+  var lines=due.map(function(x){return '• '+docLabel(x.d)+' ['+x.d.code+'] — '+(x.i.days<0?'EXPIRED '+fmt(x.i.e)+' ('+daysWord(x.i.days)+' ago)':'expires '+fmt(x.i.e)+' ('+daysWord(x.i.days)+')')+(x.d.critical?' · FLIGHT-CRITICAL':'')+' · '+x.tag+' alert'});
+  var anyBad=due.some(function(x){return x.i.days<0&&x.d.critical});
+  var subj='AeroDocs: '+due.length+' document'+(due.length>1?'s':'')+' need attention'+(anyBad?' — NO-GO':'');
+  var body='AeroDocs expiry alert · '+fmt(todayN())+'\n\n'+lines.join('\n')+'\n\nOpen AeroDocs to add renewal reminders to your calendar.\n— AeroDocs v'+VER+' (sent from your device)';
+  return sendEmail(subj,body).then(function(){due.forEach(function(x){x.keys.forEach(function(k){S.sent[k]=Date.now()})});S.lastAuto=Date.now();logIt('Sent: '+due.map(function(x){return (x.d.owner?ownerName(x.d)+' ':'')+x.d.code+' '+x.tag}).join(', '));renderEmail();toast('Alert email sent ('+due.length+')')})
+   .catch(function(err){logIt('Failed: '+(err&&err.message||err));renderEmail();if(manual)toast(inFrame?'Blocked in Claude preview. Use the hosted copy.':'Email failed. See log.')});
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-act]');if(!b)return;var a=b.getAttribute('data-act'),id=b.getAttribute('data-id');
+  switch(a){
+   case 'tab':showTab(b.getAttribute('data-tab'));break;
+   case 'filter':UI.filter=b.getAttribute('data-f');saveUI();renderDocs();break;
+   case 'theme':var o=['system','light','dark'];S.settings.theme=o[(o.indexOf(S.settings.theme)+1)%3];save();applyTheme();toast('Theme: '+S.settings.theme);break;
+   case 'add':editor(null);break;
+   case 'scan':SCAN_CTX={owner:''};scanSheet();break;
+   case 'scan-fam':if(!S.family.length){memberSheet(null);toast('Add a family member first');break}SCAN_CTX={owner:null};scanSheet();break;
+   case 'scan-for':SCAN_CTX={owner:id,fixed:true};scanSheet();break;
+   case 'add-for':editor(null,{owner:id});break;
+   case 'add-member':memberSheet(null);break;
+   case 'edit-member':memberSheet(id);break;
+   case 'member-del-ask':var dn=num(b.getAttribute('data-n'),0);$('#memDel').innerHTML='<div class="inline-confirm"><span>Delete this member'+(dn?' and their '+dn+' document'+(dn>1?'s':'')+' with attached files':'')+'? This cannot be undone.</span><div class="row"><button type="button" class="btn danger solid sm" data-act="member-del-yes" data-id="'+id+'">Delete</button><button type="button" class="btn sm" data-act="member-del-no">Keep</button></div></div>';break;
+   case 'member-del-no':$('#memDel').innerHTML='';break;
+   case 'member-del-yes':deleteMember(id);break;
+   case 'fam-filter':UI.famFilter=b.getAttribute('data-f');saveUI();renderFamily();break;
+   case 'ics-mine':if(!mine().length){toast('No documents of yours yet');break}deliver('aerodocs-my-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sortedOf(mine()),'AeroDocs · Mine'));break;
+   case 'ics-family':if(!famDocs().length){toast('No family documents yet');break}deliver('aerodocs-family-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sortedOf(famDocs()),'AeroDocs · Family'));break;
+   case 'scan-cancel':if(SCAN)SCAN.cancel=true;SCAN=null;closeSheet();break;
+   case 'scan-update':(function(job){if(!job)return;job.pick();SCAN=null;rekey(job.metas.map(function(m){return m.id}),id).then(function(){editor(id,{files:job.metas,detect:job.r})}).catch(function(e){toast('Could not attach files: '+e.message)})})(SCAN);break;
+   case 'scan-asnew':(function(job){if(!job)return;job.pick();SCAN=null;editor(null,{id:job.docId,owner:job.owner,files:job.metas,detect:job.r})})(SCAN);break;
+   case 'pick-date':$('#fExp').value=b.getAttribute('data-iso');renderDet();break;
+   case 'view-ed':if(ED)viewer(ED.files,num(b.getAttribute('data-i'),0),'editor');break;
+   case 'files':var fd=S.docs.find(function(x){return x.id===id});if(fd&&fd.files&&fd.files.length)viewer(fd.files,0,'card');break;
+   case 'vw-close':closeViewer();break;
+   case 'vw-prev':if(VW&&VW.idx>0){VW.idx--;drawViewer()}break;
+   case 'vw-next':if(VW&&VW.idx<VW.list.length-1){VW.idx++;drawViewer()}break;
+   case 'vw-share':if(VW)shareFile(VW.list[VW.idx]).catch(function(e){toast(e.message)});break;
+   case 'vw-read':if(VW&&ED){var rm=VW.list[VW.idx];closeViewer();edProgress('Preparing file',0);prepFromStored(rm).then(function(p){if(!p.ocr&&!p.pdfText){renderDet();toast('This file has no readable image or text');return}return editorScan(p)}).catch(function(e){renderDet();toast(e.message)})}break;
+   case 'vw-remove':$('#vwConfirm').innerHTML='<div class="inline-confirm"><span>Remove this file from the document? It is deleted from the device when you save.</span><div class="row"><button class="btn danger solid sm" data-act="vw-remove-yes">Remove</button><button class="btn sm" data-act="vw-remove-no">Keep</button></div></div>';break;
+   case 'vw-remove-no':$('#vwConfirm').innerHTML='';break;
+   case 'vw-remove-yes':if(VW&&ED){var fm=ED.files[VW.idx];ED.files.splice(VW.idx,1);var ai=ED.added.indexOf(fm.id);if(ai>-1){ED.added.splice(ai,1);FS.del(fm.id).catch(function(){})}else ED.removed.push(fm.id);renderEdFiles();closeViewer();toast('File removed')}break;
+   case 'ocr-warm':b.disabled=true;onOcr=function(l,p){$('#ocrState').textContent=l+(p>0&&p<1?' '+Math.round(p*100)+'%':'')};
+     Promise.all([getWorker(),ensurePdf()]).then(function(){$('#ocrState').textContent='Ready ('+ocrLang+'). Scanning works offline.'}).catch(function(e){$('#ocrState').textContent=inFrame?'Not available inside the Claude preview.':'Failed: '+(e.message||e)}).then(function(){onOcr=null;b.disabled=false});break;
+   case 'edit':editor(id);break;
+   case 'close':closeSheet();break;
+   case 'ics':var d=S.docs.find(function(x){return x.id===id});if(d)deliver('aerodocs-'+slug(d.code+'-'+(d.owner?ownerName(d)+'-':'')+d.name)+'.ics','text/calendar;charset=utf-8',icsFor([d],'AeroDocs'));break;
+   case 'bulk-ics':if(!S.docs.length){toast('Add documents first');break}deliver('aerodocs-all-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sorted(),'AeroDocs Expiries'));break;
+   case 'calc-exp':var is=$('#fIssue').value,mo=num($('#fValid').value,0);if(isNaN(isoN(is))||mo<=0){toast('Enter issue date and validity months');break}$('#fExp').value=addMonths(is,mo,$('#fEom').checked);toast('Expiry set to '+fmt($('#fExp').value));break;
+   case 'ask-delete':$('#delZone').innerHTML='<div class="inline-confirm"><span>Delete this document and its tracking? This cannot be undone.</span><div class="row"><button type="button" class="btn danger solid sm" data-act="do-delete" data-id="'+id+'">Delete</button><button type="button" class="btn sm" data-act="cancel-delete">Keep</button></div></div>';break;
+   case 'cancel-delete':$('#delZone').innerHTML='';break;
+   case 'do-delete':var dd=S.docs.find(function(x){return x.id===id})||{},nm=dd.name;(dd.files||[]).forEach(function(f){FS.del(f.id).catch(function(){})});S.docs=S.docs.filter(function(x){return x.id!==id});save();closeSheet();renderAll();toast('Deleted '+(nm||'document'));break;
+   case 'load-sample':confirmSheet('Load sample data','Adds 16 pilot documents (Medical, A320/B777 LPC, OPC, passport, visas, Oman/UAE driving licences, Mulkiya, insurance) plus 3 family members with 7 passports, visas and resident cards. Your own data stays. Remove samples in one tap later.','Load samples',false,function(){var sf=sampleFamily();S.family=S.family.filter(function(x){return !x.sample}).concat(sf.members);S.docs=S.docs.filter(function(x){return !x.sample}).concat(sampleDocs(),sf.docs);save();UI.filter='all';saveUI();showTab('docs');renderAll();toast('Sample data loaded')});break;
+   case 'remove-samples':confirmSheet('Remove sample data','Deletes every document and family member tagged Sample. Anything you added or edited stays.','Remove samples',true,function(){var gone={};S.family.forEach(function(m){if(m.sample&&!S.docs.some(function(d){return d.owner===m.id&&!d.sample}))gone[m.id]=1});
+      S.docs.filter(function(x){return x.sample||gone[x.owner]}).forEach(function(d){(d.files||[]).forEach(function(f){FS.del(f.id).catch(function(){})})});S.docs=S.docs.filter(function(x){return !x.sample&&!gone[x.owner]});S.family=S.family.filter(function(m){return !gone[m.id]});save();renderAll();toast('Samples removed')});break;
+   case 'export-json':exportSheet();break;
+   case 'import-json':$('#importFile').click();break;
+   case 'clear-all':confirmSheet('Clear all data','Deletes every document, attached file, setting and email log stored on this device. Export a backup first if you need it.','Clear everything',true,function(){S={ver:VER,docs:[],family:[],settings:Object.assign({},DEF_SET),email:Object.assign({},DEF_EM),sent:{},log:[],lastAuto:0};save();FS.clear().catch(function(){});renderAll();toast('All data cleared')});break;
+   case 'email-test':var m=emailCfgOK();if(m){toast(m);break}b.disabled=true;sendEmail('AeroDocs test email','Test from AeroDocs v'+VER+' on '+fmt(todayN())+'. Alerts are configured correctly.').then(function(){logIt('Test email sent to '+S.email.to);toast('Test email sent')}).catch(function(err){logIt('Test failed: '+(err&&err.message||err));toast(inFrame?'Blocked in Claude preview. Use the hosted copy.':'Test failed. See log.')}).then(function(){b.disabled=false;renderEmail()});break;
+   case 'email-check':b.disabled=true;runCheck(true).then(function(){b.disabled=false});break;
+   case 'copy-out':var ta=$('#txtOut');var done=function(){toast('Copied')};if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(done).catch(function(){ta.focus();ta.select();toast('Select all and copy')})}else{ta.focus();ta.select();toast('Select all and copy')}break;
+  }
+});
+$('#scrim').addEventListener('click',function(e){if(e.target===this)closeSheet()});
+document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(!$('#scrim2').hidden)closeViewer();else if(!$('#scrim').hidden)closeSheet()});
+$('#scrim2').addEventListener('click',function(e){if(e.target===this)closeViewer()});
+['scanCam','scanPick'].forEach(function(k){$('#'+k).addEventListener('change',function(){var fl=Array.prototype.slice.call(this.files||[]);this.value='';if(fl.length)scanNew(fl)})});
+['edCam','edFile'].forEach(function(k){$('#'+k).addEventListener('change',function(){var fl=Array.prototype.slice.call(this.files||[]);this.value='';if(fl.length&&ED)editorAddFiles(fl)})});
+$('#importFile').addEventListener('change',function(){var f=this.files&&this.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var j=JSON.parse(r.result),docs=Array.isArray(j)?j:j.docs;if(!Array.isArray(docs))throw 0;
+    docs=docs.filter(function(d){return d&&d.name&&!isNaN(isoN(d.expiry))}).map(function(d){return Object.assign({id:uid(),category:'Personal',code:'DOC',threshold:S.settings.threshold,window:0,critical:false},d)});
+    var jf=Array.isArray(j.files)?j.files:[];
+    var jfam=Array.isArray(j.family)?j.family:[];
+    openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Import backup</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div><p class="muted">'+esc(f.name)+' holds '+docs.length+' documents'+(jfam.length?', '+jfam.length+' family members':'')+(jf.length?' and '+jf.length+' files':'')+'.</p><p class="note" style="margin-top:8px">Merge adds what is new and keeps everything you have. Replace deletes your current '+S.docs.length+' documents first.</p><div class="sheet-f"><button class="btn danger" id="imRep">Replace all</button><button class="btn primary" id="imMerge">Merge</button></div>');
+    $('#imMerge').onclick=async function(){this.disabled=true;var have={},n=0;S.docs.forEach(function(d){have[d.id]=1});var hm={};S.family.forEach(function(m){hm[m.id]=1});
+      try{var keep={};docs.forEach(function(d){if(!have[d.id])(d.files||[]).forEach(function(x){keep[x.id]=1})});for(var i=0;i<jf.length;i++){var x=jf[i];if(keep[x.id])await FS.put({id:x.id,docId:x.docId,name:x.name,type:x.type,size:x.size,created:x.created,buf:b64ToBuf(x.b64)})}if(jf.length)askPersist()}catch(e){toast('Files could not be restored: '+(e.message||e))}
+      jfam.forEach(function(m){if(!hm[m.id])S.family.push(m)});docs.forEach(function(d){if(!have[d.id]){if(!jf.length)d.files=[];S.docs.push(d);n++}});save();closeSheet();renderAll();toast('Merged '+n+' documents')};
+    $('#imRep').onclick=function(){confirmSheet('Replace all data','Delete your current '+S.docs.length+' documents and '+S.family.length+' family members, then import '+docs.length+' documents?','Replace and import',true,async function(){
+      try{if(jf.length){await FS.clear();for(var i=0;i<jf.length;i++){var x=jf[i];await FS.put({id:x.id,docId:x.docId,name:x.name,type:x.type,size:x.size,created:x.created,buf:b64ToBuf(x.b64)})}askPersist()}
+        else docs.forEach(function(d){d.files=[]});
+      }catch(e){toast('Files could not be restored: '+(e.message||e))}
+      S.docs=docs;S.family=jfam;if(j.settings)S.settings=Object.assign({},DEF_SET,j.settings);save();renderAll();toast('Imported '+docs.length+' documents')})};
+  }catch(e){toast('Not a valid AeroDocs backup file')}};r.readAsText(f);this.value=''});
+/* settings bindings */
+function bindSettings(){
+  $('#setThr').addEventListener('change',function(){S.settings.threshold=Math.max(0,num(this.value,7));save();renderAll()});
+  $('#setTime').addEventListener('change',function(){if(/^\d{2}:\d{2}$/.test(this.value)){S.settings.alarmTime=this.value;save();renderSync()}});
+  [['#setRenew','renewalEvent'],['#setWindow','windowEvent'],['#setAudio','audio'],['#setRef','includeRef']].forEach(function(p){$(p[0]).addEventListener('change',function(){S.settings[p[1]]=this.checked;save();renderAll()})});
+  $('#setArabic').addEventListener('change',function(){S.settings.ocrArabic=this.checked;save();$('#ocrState').textContent=ocrW?'Language changed. Reloads on next scan.':''});
+  $('#leadChecks').addEventListener('change',function(e){var l=num(e.target.getAttribute('data-lead'),-1);if(l<0)return;var s=S.settings.leads.filter(function(x){return x!==l});if(e.target.checked)s.push(l);S.settings.leads=s;save();renderSync()});
+  ['emTo','ejsService','ejsTemplate','ejsPublic','relayUrl','relayToken'].forEach(function(k){$('#'+k).addEventListener('change',function(){S.email[k==='emTo'?'to':k]=this.value.trim();save()})});
+  $('#emProvider').addEventListener('change',function(){S.email.provider=this.value;save();renderEmail()});
+  $('#emExpired').addEventListener('change',function(){S.email.expired=this.checked;save()});
+  $('#emAuto').addEventListener('change',function(){S.email.auto=this.checked;save()});
+  $('#msChecks').addEventListener('change',function(e){var m=num(e.target.getAttribute('data-ms'),-1);if(m<0)return;var s=S.email.milestones.filter(function(x){return x!==m});if(e.target.checked)s.push(m);S.email.milestones=s;save()});
+}
+bindSettings();
+if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme)}catch(e){}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){renderAll();autoCheck()}});
+
+function autoCheck(){if(inFrame||!S.email.auto||S.email.provider==='off')return;if(Date.now()-S.lastAuto<6*3600e3)return;runCheck(false)}
+
+/* ---------- PWA ---------- */
+if(!inFrame&&'serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
+  window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').then(function(){renderSettings()}).catch(function(){})});
+}
+
+renderAll();
+autoCheck();
+setTimeout(function(){FS.all().then(function(all){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});
+  (all||[]).forEach(function(r){if(!keep[r.id]&&Date.now()-Date.parse(r.created||0)>3600e3)FS.del(r.id)})}).catch(function(){})},4000);
+})();
+</script>
+
+</body>
+</html>
