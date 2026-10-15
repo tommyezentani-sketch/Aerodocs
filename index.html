@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.006 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.007 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -252,7 +252,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.006</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.007</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -416,7 +416,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.006', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.007', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -1053,6 +1053,20 @@ function findDates(text,preset){
   out.sort(function(a,b){return b.score-a.score||b.n-a.n});
   return out;
 }
+/* ---------- check-record tables (LPC / OPC / LVO / line check): latest entry wins ---------- */
+function isEOM(iso){var n=isoN(iso);return new Date((n+1)*864e5).getUTCDate()===1}
+function parseCheckTable(text){
+  var t=todayN(),lines=normDigits(String(text||'')).split(/\n+/),rows=[];
+  lines.forEach(function(l,ix){var ds=findDates(l,'').sort(function(a,b){return a.idx-b.idx});
+    if(ds.length>=2){var c=ds[0].n,v=ds[1].n;if(v>c&&v-c<=480)rows.push({line:ix,check:ds[0].iso,valid:ds[1].iso,c:c,v:v})}});
+  if(rows.length){rows.sort(function(a,b){return a.c-b.c||a.line-b.line});var last=rows[rows.length-1];return {check:last.check,valid:last.valid,rows:rows.length,mode:'rows'}}
+  var all=findDates(text,'');if(all.length<2)return null;
+  var vmax=all.reduce(function(m,d){return d.n>m.n?d:m});
+  var checks=all.filter(function(d){return d.n<vmax.n&&d.n<=t&&!isEOM(d.iso)&&vmax.n-d.n<=480}).sort(function(a,b){return b.n-a.n});
+  if(!checks.length)return null;
+  return {check:checks[0].iso,valid:vmax.iso,rows:0,mode:'columns'};
+}
+var CHECK_TYPES=/^(lpc|opc|line|lvo|sep|crm|dg)$/;
 var AC_RE=/\b(A3[1-5]\d|A220|A330|A350|A380|B7[0-9]7|B737|ATR ?72|E1[79]0|E19[05]|Q400)\b/i;
 function analyse(text,mrz,method){
   var t=todayN(),r={preset:null,name:'',expiry:'',issue:'',ref:'',issuer:'',method:method,conf:'none',cands:[],text:String(text||''),mrz:mrz||null};
@@ -1071,7 +1085,10 @@ function analyse(text,mrz,method){
   if(!mrz&&r.preset==='elp'&&r.conf!=='medium'){var lv=(L.match(/levels?\s*[:\-]?\s*([456])\b/)||[])[1];
     var td=ds.filter(function(d){return d.n<=t}).sort(function(a,b){return b.n-a.n})[0];
     if(lv&&td){r.issue=td.iso;r.name='ELP Level '+lv;if(lv==='6'){r.expiry='';r.conf='low';r.note='Level 6 needs no re-test.'}else{r.expiry=nIso(isoN(addMonths(td.iso,lv==='4'?48:72,false))-1);r.conf='medium';r.calc='ELP Level '+lv+': '+(lv==='4'?4:6)+' years from the '+fmt(td.iso)+' test'}}}
-  if(!mrz&&/^(lpc|opc|line|lvo|sep|crm|dg)$/.test(r.preset||'')&&(r.conf==='low'||r.conf==='none')&&r.text.trim()){r.handwritten=true;r.expiry='';r.conf='low'}
+  if(!mrz&&CHECK_TYPES.test(r.preset||'')){var tb=parseCheckTable(r.text);
+    if(tb){r.issue=tb.check;r.expiry=tb.valid;r.conf='medium';r.calc='Latest entry'+(tb.rows>1?' of '+tb.rows:'')+': checked '+fmt(tb.check)+', valid until '+fmt(tb.valid);
+      if(!r.cands.some(function(c){return c.iso===tb.valid}))r.cands.unshift({iso:tb.valid,n:isoN(tb.valid),label:'latest entry'})}}
+  if(!mrz&&CHECK_TYPES.test(r.preset||'')&&!r.calc&&(r.conf==='low'||r.conf==='none')&&r.text.trim()){r.handwritten=true;r.expiry='';r.conf='low'}
   if(!mrz&&!r.preset&&r.conf==='low'){r.expiry='';r.unsure=true}
   var iss=/\bof oman\b|royal oman police|سلطنة عمان/.test(L)?'Oman':/united arab emirates|الإمارات/.test(L)?'UAE':/state of libya|دولة ليبيا/.test(L)?'Libya':/kingdom of saudi|السعودية/.test(L)?'Saudi Arabia':'';
   if(!r.issuer&&iss)r.issuer=iss;
@@ -1127,11 +1144,11 @@ function renderDet(){
   var r=ED&&ED.det,el=$('#detBox');if(!el)return;if(!r){el.hidden=true;return}el.hidden=false;
   var pn=(presetBy(r.preset)||{}).name||'Unknown type',cur=$('#fExp').value;
   var head={high:'Read from the passport/ID machine-readable zone. Check digits verified.',medium:r.method==='mrz'?'Read from the machine-readable zone, but a check digit failed. Verify the date.':'Expiry found next to an expiry label. Verify before saving.',low:'No expiry label found. Best guess selected; tap the correct date below.',none:'No readable text found. Enter the details manually.'}[r.conf];
-  var src={mrz:'MRZ',ocr:'Photo OCR','pdf-text':'PDF text',none:'—'}[r.method]||r.method;
-  if(r.calc)head='Calculated: '+esc(r.calc)+'. Check against the licence remarks.';
+  var src={mrz:'MRZ',ocr:'Photo OCR','pdf-text':'PDF text',paste:'Live Text',none:'—'}[r.method]||r.method;
+  if(r.calc)head=(/^Latest entry/.test(r.calc)?esc(r.calc)+'. Verify against the card.':'Calculated: '+esc(r.calc)+'. Check against the licence remarks.');
   if(r.unsure)head='Document type not recognised and no date is labelled as expiry, so nothing was filled in. Pick the type, then tap the correct date below or enter it.';
-  if(r.handwritten)head='The entries look handwritten. The phone cannot read handwriting reliably, so no date was guessed. Enter the latest check date and AeroDocs applies the validity and base-month rule.';
-  var hw=r.handwritten?'<div class="row" style="align-items:flex-end"><div class="field" style="flex:1 1 150px"><label for="hwDate">Latest check date</label><input id="hwDate" type="date"></div><button type="button" class="btn sm primary" data-act="hw-apply">Calculate expiry</button></div>':'';
+  if(r.handwritten)head='The entries look handwritten, so no date was guessed. Paste the text from iPhone Live Text below (it reads handwriting), or enter the latest check date.';
+  var hw=r.handwritten?'<div class="field"><label for="ltText">Paste Live Text from the photo</label><textarea id="ltText" placeholder="Photos → open the image → Live Text icon → Select All → Copy, then paste here" style="min-height:70px"></textarea><div class="row"><button type="button" class="btn sm primary" data-act="lt-read">Read pasted text</button><span class="hint">The latest row is used.</span></div></div><div class="row" style="align-items:flex-end"><div class="field" style="flex:1 1 150px"><label for="hwDate">Latest check date</label><input id="hwDate" type="date"></div><button type="button" class="btn sm primary" data-act="hw-apply">Calculate expiry</button></div>':'';
   var chg=ED.orig&&cur&&cur!==ED.orig?'<div>Expiry update: <span class="mono">'+fmt(ED.orig)+'</span> → <b class="mono">'+fmt(cur)+'</b> (previous date kept in history)</div>':'';
   el.className='det '+r.conf;
   el.innerHTML='<div class="det-h"><span class="pill '+(r.conf==='high'?'ok':r.conf==='none'?'neutral':'warn')+'"><span class="dot"></span>'+esc(src)+'</span>Detected: '+esc(r.preset?pn:'Unknown type')+'</div><div>'+head+'</div>'+hw+chg+
@@ -1162,7 +1179,14 @@ function scanSheet(){
   openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Scan a document</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
    '<p class="muted">AeroDocs reads the document on this device, identifies the type and finds the expiry date. The image or PDF is attached to the record.</p>'+
    '<div class="scan-opts"><label class="btn primary big" for="scanCam">'+IC.cam+'Take photo</label><label class="btn big" for="scanPick">'+IC.up+'Photo, PDF or file</label></div>'+
+   '<button class="btn" data-act="paste-scan" style="width:100%;margin-bottom:12px">Paste text from iPhone Live Text (best for handwriting)</button>'+
    '<ul class="tips"><li>Lay the document flat in good light and fill the frame.</li><li>Passport: include the two lines of &lt;&lt;&lt; characters at the bottom of the photo page.</li><li>ID or residence card: scan the side with the three &lt;&lt;&lt; lines.</li><li>Medical certificates and check forms: the emailed PDF reads best.</li><li>Scanning a renewed document offers to update the existing record.</li></ul>');
+}
+function pasteSheet(){
+  openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Paste Live Text</h3><button class="icon-btn" data-act="close" aria-label="Close">✕</button></div>'+
+   '<ol class="steps"><li>Open the photo in Photos (or point the Camera at the card).</li><li>Tap the Live Text icon, then Select All → Copy.</li><li>Paste below. For check records the latest row is used.</li></ol>'+
+   '<textarea id="pasteText" style="min-height:180px;margin-top:10px;font-family:var(--f-mono);font-size:14px" placeholder="A320 P1 13.08.26 30.09.27"></textarea>'+
+   '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="paste-go">Read text</button></div>');
 }
 function progSheet(){
   openSheet('<div class="grabber"></div><div class="sheet-h"><h3 id="sheetTitle">Reading document</h3></div><div class="scan-prog"><img id="spThumb" alt="" hidden><div style="flex:1;min-width:0"><div id="spStage" class="muted">Preparing file</div><div class="bar"><span id="spBar"></span></div></div></div><div class="sheet-f"><button class="btn" data-act="scan-cancel">Cancel</button></div>');
@@ -1344,6 +1368,12 @@ document.addEventListener('click',function(ev){
    case 'bulk-ics':if(!S.docs.length){toast('Add documents first');break}deliver('aerodocs-all-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sorted(),'AeroDocs Expiries'));break;
    case 'calc-exp':var is=$('#fIssue').value,mo=num($('#fValid').value,0);if(isNaN(isoN(is))||mo<=0){toast('Enter issue date and validity months');break}
      var ce=computeExpiry(is,mo,$('#fEom').checked,ED&&ED.orig,num($('#fWin').value,0));$('#fExp').value=ce.iso;toast('Expiry '+fmt(ce.iso)+'. '+ce.rule);if(ED&&ED.det)renderDet();break;
+   case 'lt-read':var lt=$('#ltText').value;if(!lt.trim()){toast('Paste the copied text first');break}
+     var pr0=$('#fPreset').value,rr=analyse(lt,findMRZ(lt),'paste');if(pr0&&CHECK_TYPES.test(pr0)&&!rr.calc){var tb2=parseCheckTable(lt);if(tb2){rr.preset=pr0;rr.issue=tb2.check;rr.expiry=tb2.valid;rr.conf='medium';rr.calc='Latest entry'+(tb2.rows>1?' of '+tb2.rows:'')+': checked '+fmt(tb2.check)+', valid until '+fmt(tb2.valid);rr.handwritten=false}}
+     if(!rr.expiry){toast('No check date and validity pair found in the pasted text');break}if(pr0)rr.preset=pr0;applyDetection(rr);toast('Expiry set to '+fmt(rr.expiry));break;
+   case 'paste-scan':closeSheet();pasteSheet();break;
+   case 'paste-go':var pt=$('#pasteText').value;if(!pt.trim()){toast('Paste the copied text first');break}var pr=analyse(pt,findMRZ(pt),'paste');closeSheet();
+     var po=SCAN_CTX&&SCAN_CTX.owner!=null?SCAN_CTX.owner:'';var phm=matchMember(pr);if(phm&&!(SCAN_CTX&&SCAN_CTX.fixed))po=phm;editor(null,{owner:po,detect:pr});break;
    case 'hw-apply':var hd=$('#hwDate').value;if(isNaN(isoN(hd))){toast('Enter the latest check date');break}$('#fIssue').value=hd;var hm=num($('#fValid').value,0);if(hm<=0){toast('Set the validity in months first');break}
      var he=computeExpiry(hd,hm,$('#fEom').checked,ED&&ED.orig,num($('#fWin').value,0));$('#fExp').value=he.iso;if(ED&&ED.det){ED.det.handwritten=false;ED.det.calc=fmt(hd)+' check, '+hm+' months'+($('#fEom').checked?' to end of month':'')+'. '+he.rule;ED.det.conf='medium'}renderDet();toast('Expiry set to '+fmt(he.iso));break;
    case 'ask-delete':$('#delZone').innerHTML='<div class="inline-confirm"><span>Delete this document and its tracking? This cannot be undone.</span><div class="row"><button type="button" class="btn danger solid sm" data-act="do-delete" data-id="'+id+'">Delete</button><button type="button" class="btn sm" data-act="cancel-delete">Keep</button></div></div>';break;
