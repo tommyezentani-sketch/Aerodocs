@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.008 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.009 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -260,7 +260,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.008</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.009</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -271,6 +271,7 @@ input[type=date]{font-family:var(--f-mono)}
 
 <main class="wrap">
   <section id="tab-docs" data-tab>
+    <div id="updBanner" class="banner" hidden><span id="updText">A new version of AeroDocs is available.</span><button class="btn sm primary" data-act="do-update">Update now</button></div>
     <div id="sampleBanner" class="banner" hidden>
       <span>Sample pilot data loaded. Replace with your own documents.</span>
       <button class="btn sm" data-act="remove-samples">Remove samples</button>
@@ -391,7 +392,8 @@ input[type=date]{font-family:var(--f-mono)}
     </div>
     <div class="panel">
       <h3>Install on iPhone</h3>
-      <dl class="kv"><dt>Mode</dt><dd id="modeTxt"></dd><dt>Offline cache</dt><dd id="swTxt"></dd></dl>
+      <dl class="kv"><dt>Mode</dt><dd id="modeTxt"></dd><dt>Offline cache</dt><dd id="swTxt"></dd><dt>Version</dt><dd id="verTxt"></dd></dl>
+      <div class="row"><button class="btn" data-act="check-update">Check for updates</button><span class="note" id="updState"></span></div>
       <ol class="steps">
         <li>Open the hosted AeroDocs URL in <b>Safari</b> (HTTPS).</li>
         <li>Tap <b>Share</b> → <b>Add to Home Screen</b> → name it AeroDocs → <b>Add</b>.</li>
@@ -424,7 +426,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.008', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.009', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -712,6 +714,7 @@ function renderSettings(){
   var s=S.settings;
   $('#setThr').value=s.threshold;$('#setTime').value=s.alarmTime;$('#setRenew').checked=s.renewalEvent;$('#setWindow').checked=s.windowEvent;$('#setAudio').checked=s.audio;$('#setRef').checked=s.includeRef;
   $('#leadChecks').innerHTML=LEADS.map(function(l){return '<label class="check"><input type="checkbox" data-lead="'+l+'"'+(s.leads.indexOf(l)>-1?' checked':'')+'> '+l+'d</label>'}).join('');
+  $('#verTxt').textContent='v'+VER+' · build '+BUILD;
   $('#modeTxt').textContent=inFrame?'Claude preview (not installable)':isStandalone?'Home Screen app':'Browser tab';
   $('#swTxt').textContent=inFrame?'n/a in preview':('serviceWorker' in navigator)?(navigator.serviceWorker.controller?'Active':'Registering / not hosted over HTTPS'):'Not supported';
   $('#storageNote').textContent=storageOK?(S.docs.length+' documents stored locally.'):'Storage unavailable in this view. Changes last until you close the page.';
@@ -1437,6 +1440,8 @@ document.addEventListener('click',function(ev){
      var pr0=$('#fPreset').value,rr=analyse(lt,findMRZ(lt),'paste');if(pr0&&CHECK_TYPES.test(pr0)&&!rr.calc){var tb2=parseCheckTable(lt);if(tb2){rr.preset=pr0;rr.issue=tb2.check;rr.expiry=tb2.valid;rr.conf='medium';rr.calc='Latest entry'+(tb2.rows>1?' of '+tb2.rows:'')+': checked '+fmt(tb2.check)+', valid until '+fmt(tb2.valid);rr.handwritten=false}}
      if(!rr.expiry){toast('No check date and validity pair found in the pasted text');break}if(pr0)rr.preset=pr0;applyDetection(rr);toast('Expiry set to '+fmt(rr.expiry));break;
    case 'list-apply':applyList();break;
+   case 'check-update':checkUpdate(true);break;
+   case 'do-update':doUpdate();break;
    case 'paste-scan':closeSheet();pasteSheet();break;
    case 'paste-go':var pt=$('#pasteText').value;if(!pt.trim()){toast('Paste the copied text first');break}var pr=analyse(pt,findMRZ(pt),'paste');closeSheet();if(pr.list){listSheet(pr.list);break}
      var po=SCAN_CTX&&SCAN_CTX.owner!=null?SCAN_CTX.owner:'';var phm=matchMember(pr);if(phm&&!(SCAN_CTX&&SCAN_CTX.fixed))po=phm;editor(null,{owner:po,detect:pr});break;
@@ -1491,10 +1496,27 @@ function bindSettings(){
 }
 bindSettings();
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme)}catch(e){}
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){renderAll();autoCheck()}});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){renderAll();autoCheck();checkUpdate(false)}});
 
 function autoCheck(){if(inFrame||!S.email.auto||S.email.provider==='off')return;if(Date.now()-S.lastAuto<6*3600e3)return;runCheck(false)}
 
+/* ---------- updates: compare with version.json on the server, never trust a cached copy ---------- */
+var latestVer=null;
+function checkUpdate(manual){
+  if(inFrame||!navigator.onLine){if(manual)$('#updState').textContent=inFrame?'Not available in the Claude preview':'Offline';return Promise.resolve()}
+  return fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){
+    if(!j||!j.version)return;latestVer=j.version;
+    var newer=j.version!==VER&&j.version.localeCompare(VER,undefined,{numeric:true})>0;
+    $('#updBanner').hidden=!newer;if(newer)$('#updText').textContent='AeroDocs v'+j.version+' is available (you have v'+VER+').';
+    if(manual)$('#updState').textContent=newer?'v'+j.version+' available':'Up to date (v'+VER+')';
+  }).catch(function(){if(manual)$('#updState').textContent='Could not reach the server'});
+}
+async function doUpdate(){
+  toast('Updating…');
+  try{if(window.caches){var ks=await caches.keys();await Promise.all(ks.filter(function(k){return /^aerodocs-v/.test(k)}).map(function(k){return caches.delete(k)}))}}catch(e){}
+  try{if(navigator.serviceWorker){var rg=await navigator.serviceWorker.getRegistration();if(rg)await rg.update()}}catch(e){}
+  location.replace(location.pathname+'?v='+(latestVer||Date.now()));
+}
 /* ---------- PWA ---------- */
 if(!inFrame&&'serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
   window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').then(function(){renderSettings()}).catch(function(){})});
@@ -1502,6 +1524,7 @@ if(!inFrame&&'serviceWorker' in navigator&&(location.protocol==='https:'||locati
 
 renderAll();
 autoCheck();
+checkUpdate(false);
 setTimeout(function(){FS.all().then(function(all){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});
   (all||[]).forEach(function(r){if(!keep[r.id]&&Date.now()-Date.parse(r.created||0)>3600e3)FS.del(r.id)})}).catch(function(){})},4000);
 })();

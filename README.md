@@ -1,4 +1,4 @@
-# AeroDocs v1.008 — Pilot & Family Expiry Tracker (PWA)
+# AeroDocs v1.009 — Pilot & Family Expiry Tracker (PWA)
 
 ## Files
 | File | Purpose |
@@ -22,7 +22,7 @@
 2. Share → Add to Home Screen → Add.
 3. Launch from the icon. Data lives in the Home Screen app's own storage (separate from Safari). Load or import data there.
 
-## Scan & files (v1.008)
+## Scan & files (v1.009)
 - Scan → Take photo, or choose a photo / PDF. OCR runs on the phone; nothing is uploaded.
 - Passports, visas, ID/resident cards: expiry, number and issuing state read from the MRZ with ICAO 9303 check digits.
 - Other documents: type from keywords (English/Arabic), expiry from the date nearest an expiry label. Every date found is offered as a tap-to-select chip.
