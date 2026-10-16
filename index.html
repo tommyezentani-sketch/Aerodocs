@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.012 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.013 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -73,6 +73,8 @@ a{color:var(--accent)}
 .today{font-size:.78rem;color:var(--ink-2);padding:4px 8px;border:1px solid var(--line);border-radius:6px;white-space:nowrap}
 .icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer}
 .icon-btn svg{width:18px;height:18px}
+.icon-btn.upd{position:relative}.icon-btn.upd .dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid var(--surface)}
+.icon-btn.spin svg{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 
 main{display:block}
 section[data-tab]{display:flex;flex-direction:column;gap:16px}
@@ -263,10 +265,11 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Pilot expiry tracker · <span id="verTag">v1.012</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Expiry tracker · <span id="verTag">v1.013</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
+      <button class="icon-btn upd" id="updBtn" data-act="tap-update" aria-label="Check for updates" title="Check for updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg><span class="dot" id="updDot" hidden></span></button>
       <button class="icon-btn" id="themeBtn" data-act="theme" aria-label="Change theme" title="Theme"></button>
     </div>
   </div>
@@ -397,7 +400,7 @@ input[type=date]{font-family:var(--f-mono)}
     <div class="panel">
       <h3>Install on iPhone</h3>
       <dl class="kv"><dt>Mode</dt><dd id="modeTxt"></dd><dt>Offline cache</dt><dd id="swTxt"></dd><dt>Version</dt><dd id="verTxt"></dd></dl>
-      <div class="row"><button class="btn" data-act="check-update">Check for updates</button><span class="note" id="updState"></span></div>
+      <div class="row"><button class="btn primary" data-act="check-update">Check and install update</button><span class="note" id="updState"></span></div>
       <ol class="steps">
         <li>Open the hosted AeroDocs URL in <b>Safari</b> (HTTPS).</li>
         <li>Tap <b>Share</b> → <b>Add to Home Screen</b> → name it AeroDocs → <b>Add</b>.</li>
@@ -430,7 +433,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.012', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.013', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -439,9 +442,12 @@ var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s
 
 /* ---------- presets (validity in months, eom = valid to end of month, window = revalidation window days) ---------- */
 var PRESETS=[
- {k:'med1',g:'Aviation',name:'Medical Class 1',code:'MED',auth:'Aviation Medical Examiner',valid:12,eom:false,thr:45,win:45,crit:true,hint:'Revalidation exam up to 45 days before expiry keeps the original expiry date.'},
- {k:'lic',g:'Aviation',name:'Pilot Licence (ATPL/CPL)',code:'LIC',auth:'CAA',valid:0,eom:false,thr:90,win:0,crit:true},
- {k:'lpc',g:'Aviation',name:'Type Rating LPC',code:'LPC',auth:'Operator / TRE',valid:12,eom:true,thr:60,win:90,crit:true,hint:'Revalidation in the last 3 months of validity runs the new period from the current expiry.'},
+ {k:'med1',g:'Aviation',name:'Medical Class 1 — Oman CAA',code:'MED',auth:'CAA Oman AME',valid:12,eom:false,thr:45,win:45,crit:true,hint:'Revalidation exam up to 45 days before expiry keeps the original expiry date.'},
+ {k:'med_easa',g:'Aviation',name:'Medical Class 1 — EASA',code:'MEDE',auth:'EASA AeMC / AME',valid:12,eom:false,thr:45,win:45,crit:false,hint:'Part-MED: 12 months under age 60 (6 months over 40 for single-pilot passenger ops, over 60 otherwise). Revalidation up to 45 days early keeps the expiry date.'},
+ {k:'lic',g:'Aviation',name:'ATPL(A) Licence — Oman CAA',code:'LIC',auth:'CAA Oman',valid:60,eom:true,thr:90,win:0,crit:true,hint:'Not valid without a current certificate of test (type rating/IR) and medical.'},
+ {k:'lic_easa',g:'Aviation',name:'EASA Part-FCL Licence — France DGAC',code:'LICE',auth:'DGAC France',valid:0,eom:false,thr:90,win:0,crit:false,hint:'EASA Part-FCL licences are normally issued without an expiry date; the ratings on it carry their own validity. Enter the date you want to track, e.g. the type rating or IR revalidation.'},
+ {k:'lpc',g:'Aviation',name:'Type Rating LPC (12 months)',code:'LPC',auth:'Operator / TRE',valid:12,eom:true,thr:60,win:90,crit:true,hint:'Revalidation in the last 3 months of validity runs the new period from the current expiry.'},
+ {k:'opclvo',g:'Aviation',name:'OPC + LVO',code:'OPC',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:true,hint:'Combined operator proficiency check and low-visibility qualification: 6 months, to the end of the month.'},
  {k:'opc',g:'Aviation',name:'Operator Proficiency Check (OPC)',code:'OPC',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:true},
  {k:'line',g:'Aviation',name:'Line Check',code:'LC',auth:'Operator / LTC',valid:12,eom:true,thr:45,win:90,crit:true},
  {k:'lvo',g:'Aviation',name:'LVO Qualification (CAT II/III)',code:'LVO',auth:'Operator / TRE',valid:6,eom:true,thr:45,win:90,crit:false,hint:'Expiry restricts low-visibility operations. Operator base-month rules vary: verify against the certificate.'},
@@ -456,6 +462,7 @@ var PRESETS=[
  {k:'elp',g:'Aviation',name:'Language Proficiency (ELP)',code:'ELP',auth:'CAA',valid:72,eom:false,thr:180,win:0,crit:true,hint:'Level 4: 4 years, Level 5: 6 years from the test date, Level 6: no re-test. Validity printed in the licence remarks prevails.'},
  {k:'ppt',g:'Aviation',name:'Passport',code:'PPT',auth:'',valid:120,eom:false,thr:180,win:0,crit:true,hint:'Many states refuse entry with less than 6 months validity. Threshold set to 180 days.'},
  {k:'visa',g:'Aviation',name:'Visa / Residence Permit',code:'VISA',auth:'',valid:0,eom:false,thr:30,win:0,crit:false},
+ {k:'coid',g:'Aviation',name:'Company ID Card',code:'COID',auth:'Employer',valid:0,eom:false,thr:30,win:0,crit:false,hint:'Usually tied to the residence visa: renew both together.'},
  {k:'sec',g:'Aviation',name:'Airport Security Pass',code:'SEC',auth:'Airport Authority',valid:12,eom:false,thr:30,win:0,crit:true},
  {k:'id',g:'Personal',name:'ID / Resident Card',code:'ID',auth:'',valid:0,eom:false,thr:30,win:0,crit:false},
  {k:'hins',g:'Personal',name:'Health Insurance Card',code:'HINS',auth:'',valid:12,eom:false,thr:30,win:0,crit:false},
@@ -546,7 +553,7 @@ function applyTheme(){
 
 /* ---------- family ---------- */
 var RELS=['Spouse','Son','Daughter','Father','Mother','Brother','Sister','Other'];
-var AV_ONLY={med1:1,lic:1,lpc:1,opc:1,line:1,crm:1,sep:1,dg:1,elp:1,sec:1,lvo:1,etops:1,avsec:1,sms:1,recl:1,rect:1};
+var AV_ONLY={med1:1,med_easa:1,lic:1,lic_easa:1,opclvo:1,coid:1,lpc:1,opc:1,line:1,crm:1,sep:1,dg:1,elp:1,sec:1,lvo:1,etops:1,avsec:1,sms:1,recl:1,rect:1};
 function mine(){return S.docs.filter(function(d){return !d.owner})}
 function famDocs(mid){return S.docs.filter(function(d){return mid?d.owner===mid:!!d.owner})}
 function member(id){return S.family.find(function(m){return m.id===id})}
@@ -658,7 +665,7 @@ function renderRunway(){
     marks+='<button class="rw-mark '+o.i.st+'" style="left:'+o.p.toFixed(2)+'%;top:'+top+'px" data-act="edit" data-id="'+o.d.id+'" title="'+esc(o.d.name)+' · '+fmt(o.i.e)+'" aria-label="'+esc(o.d.name)+', '+fmt(o.i.e)+'"></button>'});
   var ticks='',labels='<span style="left:0">NOW</span>',d0=new Date(t*864e5);
   for(var k=1;k<=12;k++){var n=Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth()+k,1)/864e5,p=(n-t)/span*100;if(p>100)break;
-    ticks+='<div class="rw-tick" style="left:'+p.toFixed(2)+'%"></div>';if(k%2===0||k===1)labels+='<span style="left:'+p.toFixed(2)+'%">'+MON[new Date(n*864e5).getUTCMonth()]+'</span>'}
+    ticks+='<div class="rw-tick" style="left:'+p.toFixed(2)+'%"></div>';if((k%2===0||k===1)&&p>9)labels+='<span style="left:'+p.toFixed(2)+'%">'+MON[new Date(n*864e5).getUTCMonth()]+'</span>'}
   var nxt=items.filter(function(o){return o.i.days>=0})[0];
   el.innerHTML='<div class="rw-head"><span class="eyebrow">Next 12 months</span><span class="note">'+(nxt?'Next expiry: <b>'+esc(nxt.d.name)+'</b> · '+fmt(nxt.i.e):'All tracked items expired')+'</span></div>'+
    '<div class="rw-track" style="--rw-h:'+h+'px">'+ticks+marks+'</div><div class="rw-labels">'+labels+'</div>';
@@ -1035,6 +1042,7 @@ var COUNTRY={OMN:'Oman',ARE:'UAE',LBY:'Libya',SAU:'Saudi Arabia',QAT:'Qatar',KWT
 var CLASS=[
  ['ppt',[['passport',3],['جواز',3],['passeport',3],['p<',2]]],
  ['visa',[['residence permit',3],['entry permit',3],['visa',2],['تأشيرة',3],['إقامة',2],['اقامة',2],['residence',1]]],
+ ['coid',[['join date',5],['if found please return',4],['blood type',3],['employee id',4],['staff id',4],['employee no',3],['staff no',2],['category',1]]],
  ['id',[['identity card',3],['resident card',3],['resident',2],['vil number',2],['vilnumber',2],['id card',2],['بطاقة',2],['emirates id',3],['civil number',2],['الرقم المدني',3]]],
  ['lvo',[['lvo qualification',5],['low visibility',4],['cat iii',3],['cat ii',2],['lvo',3]]],
  ['elp',[['language proficiency',5],['english proficiency',4],['icao english',3]]],
@@ -1055,7 +1063,7 @@ function classify(text){var l=String(text||'').toLowerCase().replace(/\s+/g,' ')
   CLASS.forEach(function(c){var s=0;c[1].forEach(function(k){var i=-1,n=0;while(n<3&&(i=l.indexOf(k[0],i+1))>-1)n++;s+=n*k[1]});if(s>bs){bs=s;best=c[0]}});
   return {k:bs>=2?best:null,s:bs}}
 var EXP_KW=['expiry','expiration','expires','expire','exp.','exp:','exp ','valid until','valid till','valid to','valid thru','validity','until','تاريخ الانتهاء','الانتهاء','انتهاء','تنتهي','ينتهي','صالح حتى','صالحة حتى','لغاية'];
-var NEG_KW=['birth','dob','born','issue','issued','grant','printed','use by','next ','audiogram','ecg','date of test','test date','assessment date','renewal on','last renewal','valid from','date of exam','examination','تاريخ الميلاد','الميلاد','الإصدار','الاصدار','اصدار'];
+var NEG_KW=['birth','dob','born','join','joined','hire','issue','issued','grant','printed','use by','next ','audiogram','ecg','date of test','test date','assessment date','renewal on','last renewal','valid from','date of exam','examination','تاريخ الميلاد','الميلاد','الإصدار','الاصدار','اصدار'];
 function lastHit(s,kws){var b=-1;kws.forEach(function(k){var i=s.lastIndexOf(k);if(i>b)b=i});return b}
 function firstHit(s,kws){var b=-1;kws.forEach(function(k){var i=s.indexOf(k);if(i>-1&&(b<0||i<b))b=i});return b}
 var MONMAP={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,SEPT:9,OCT:10,NOV:11,DEC:12};
@@ -1077,7 +1085,8 @@ function findDates(text,preset){
     var n=isoN(o.iso),pre=Lw.slice(Math.max(0,o.idx-70),o.idx),post=Lw.slice(o.idx+o.len,o.idx+o.len+30),e=lastHit(pre,EXP_KW),g=lastHit(pre,NEG_KW),s=0,lab='';
     if(e>-1&&e>=g){s+=10;lab='expiry label'}else if(g>-1){s-=8;lab='issue/birth label'}
     else{if(firstHit(post,EXP_KW)>-1){s+=6;lab='expiry label'}else if(firstHit(post,NEG_KW)>-1){s-=5;lab='issue/birth label'}}
-    if(preset==='med1'&&/class\s*(1|i)\b/.test(pre.slice(-40))){s+=6;lab=lab||'class 1'}
+    if(/^med/.test(preset||'')&&/class\s*(1|i|one)\b/.test(pre.slice(-40))){s+=6;lab=lab||'class 1'}
+    if(/^med/.test(preset||'')&&/\blapl\b|class\s*(2|ii)\b/.test(pre.slice(-40))){s-=8;lab='class 2 / LAPL'}
     var near=pre.slice(-60);
     if((preset==='lic'||preset==='med1')&&/\belp\b|language/.test(pre.slice(-45))){s-=10;lab='ELP validity'}
     if(preset!=='ppt'&&/travel document|passport|جواز/.test(near)&&/expir|انتهاء/.test(near)){s-=12;lab='passport expiry'}
@@ -1101,9 +1110,9 @@ function parseCheckTable(text){
   if(!checks.length)return null;
   return {check:checks[0].iso,valid:vmax.iso,rows:0,mode:'columns'};
 }
-var CHECK_TYPES=/^(lpc|opc|line|lvo|sep|crm|dg)$/;
+var CHECK_TYPES=/^(lpc|opc|opclvo|line|lvo|sep|crm|dg)$/;
 /* ---------- expiry lists (crew app / roster system screenshots): CODE  dd/mm/yyyy per row ---------- */
-var LIST_MAP={MED:'med1',MEDICAL:'med1',OPC:'opc',LPC:'lpc',ALC:'line',LC:'line',LINE:'line',CRM:'crm',DGR:'dg',DG:'dg',SEP:'sep',SEPD:'sep',SEC:'avsec',AVSEC:'avsec',ELP:'elp',ELP4:'elp',ELP5:'elp',ELP6:'elp',ETOPS:'etops',EDTO:'etops',SMS:'sms',PASS:'ppt',PPT:'ppt',PASSPORT:'ppt',LICN:'lic',LIC:'lic',LICENCE:'lic',LICENSE:'lic',LAND:'recl',TOFF:'rect',LVO:'lvo',LVTO:'lvo',CAT3:'lvo',VISA:'visa',RP:'id'};
+var LIST_MAP={COID:'coid',IDCARD:'coid',CID:'coid',MEDE:'med_easa',LICE:'lic_easa',MED:'med1',MEDICAL:'med1',OPC:'opc',LPC:'lpc',ALC:'line',LC:'line',LINE:'line',CRM:'crm',DGR:'dg',DG:'dg',SEP:'sep',SEPD:'sep',SEC:'avsec',AVSEC:'avsec',ELP:'elp',ELP4:'elp',ELP5:'elp',ELP6:'elp',ETOPS:'etops',EDTO:'etops',SMS:'sms',PASS:'ppt',PPT:'ppt',PASSPORT:'ppt',LICN:'lic',LIC:'lic',LICENCE:'lic',LICENSE:'lic',LAND:'recl',TOFF:'rect',LVO:'lvo',LVTO:'lvo',CAT3:'lvo',VISA:'visa',RP:'id'};
 var LIST_NAME={ALC:'Annual Line Check (ALC)',SEPD:'SEP Drills (SEPD)',ELP4:'ELP Level 4',ELP5:'ELP Level 5',ELP6:'ELP Level 6',SEC:'Aviation Security Training (SEC)'};
 function parseExpiryList(text){
   var T=normDigits(String(text||'')).toUpperCase(),out=[],seen={};
@@ -1160,6 +1169,10 @@ function analyse(text,mrz,method){
     r.preset=c==='P'?'ppt':c==='V'?'visa':'id';r.name=(c==='P'?'Passport':c==='V'?'Visa':'ID / Resident Card')+(cn?' ('+cn+')':'');
     r.expiry=mrz.expiry;r.ref=mrz.numberOK?mrz.number:'';r.issuer=cn;r.method='mrz';r.conf=mrz.checks.expiry?'high':'medium'}
   if(!r.preset)r.preset=classify(text).k;
+  var LT=String(text||'').toLowerCase().replace(/\s+/g,' '),isEasa=/\beasa\b|dgac|part[\s-]?fcl|part[\s-]?med|république française|republique francaise|direction générale de l.aviation civile|aviation civile/.test(LT),isOman=/sultanate of oman|civil aviation authority|caa oman|سلطنة عمان/.test(LT);
+  if(r.preset==='lic'&&isEasa&&!isOman)r.preset='lic_easa';
+  if(r.preset==='med1'&&isEasa&&!isOman)r.preset='med_easa';
+  if((r.preset==='opc'||r.preset==='lvo')&&/operator proficiency|\bopc\b/.test(LT)&&/\blvo\b|low visibility|cat ?ii/.test(LT))r.preset='opclvo';
   var ds=findDates(text,r.preset);
   if(mrz&&mrz.expiry){ds=ds.filter(function(d){return d.iso!==mrz.expiry});ds.unshift({iso:mrz.expiry,n:isoN(mrz.expiry),label:'MRZ',score:99})}
   var seenC={};r.cands=ds.filter(function(d){if(seenC[d.iso])return false;seenC[d.iso]=1;return true}).slice(0,6);
@@ -1294,6 +1307,9 @@ async function scanNew(list){
       await storeFile(p,p.meta,job.docId);job.metas.push(p.meta);if(p.ocr)preps.push(p);if(!primary&&p.ocr)primary=p;
       if(p.meta.thumb&&$('#spThumb')){$('#spThumb').src=p.meta.thumb;$('#spThumb').hidden=false}}
     if(!job.cancel&&primary){try{r=await detectFrom(primary,spSet);if(r.rotation){spSet('Straightening image',0.9);await applyRotation(primary.meta,r.rotation)}}catch(e){toast(ocrErrMsg(e));r=analyse('',null,'none')}}
+    if(!job.cancel&&r&&!r.list&&!r.mrz&&preps.length>1&&(!r.expiry||r.conf!=='medium')){var texts=[r.text],got=null;
+      for(var qi=1;qi<preps.length&&qi<5;qi++){spSet('Reading photo '+(qi+1)+' of '+preps.length,0);try{var rq=await detectFrom(preps[qi],spSet);if(rq.rotation)await applyRotation(preps[qi].meta,rq.rotation);if(rq.list){got=rq;break}if(rq.mrz){got=rq;break}texts.push(rq.text)}catch(e){}}
+      if(got)r=got;else{var rc=analyse(texts.join('\n'),null,'ocr');if(rc.expiry||(!r.preset&&rc.preset))r=rc}}
   }catch(e){toast(e.message||'Could not read the file')}
   if(job.cancel||SCAN!==job){job.metas.forEach(function(m){FS.del(m.id).catch(function(){})});return}
   if(r&&r.list&&!job.cancel){var seenL={};r.list.forEach(function(x){seenL[x.code]=1});
@@ -1471,7 +1487,7 @@ document.addEventListener('click',function(ev){
    case 'as-list':if(ED&&ED.det){var tx=normDigits(ED.det.text).toUpperCase(),ds=findDates(tx,'').sort(function(a,b){return a.idx-b.idx}),rows=[],sn={};
      ds.forEach(function(d,i){var back=tx.slice(Math.max(0,d.idx-60),d.idx),mm=back.match(/([A-Z][A-Z0-9]{1,9})[^A-Z0-9]*$/),c=mm&&!/^(DATE|VALID|UNTIL|EXPIRY|EXP)$/.test(mm[1])?mm[1]:'ITEM'+(i+1);if(sn[c])return;sn[c]=1;rows.push({code:c,iso:d.iso})});
      if(rows.length<2){toast('Not enough dated rows found');break}if(ED.isNew){ED.added.forEach(function(fid){FS.del(fid).catch(function(){})});ED.added=[]}ED.saved=true;closeSheet();listSheet(rows)}break;
-   case 'check-update':checkUpdate(true);break;
+   case 'check-update':case 'tap-update':var ub=$('#updBtn');ub.classList.add('spin');checkUpdate(true).then(function(nw){ub.classList.remove('spin');if(nw)doUpdate();else if(nw===false)toast('AeroDocs is up to date (v'+VER+')');else toast(inFrame?'Updates are not available in the preview':'Could not reach the server. Check the connection.')});break;
    case 'do-update':doUpdate();break;
    case 'paste-scan':closeSheet();pasteSheet();break;
    case 'paste-go':var pt=$('#pasteText').value;if(!pt.trim()){toast('Paste the copied text first');break}var pr=analyse(pt,findMRZ(pt),'paste');closeSheet();if(pr.list){listSheet(pr.list);break}
@@ -1538,8 +1554,9 @@ function checkUpdate(manual){
   return fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){
     if(!j||!j.version)return;latestVer=j.version;
     var newer=j.version!==VER&&j.version.localeCompare(VER,undefined,{numeric:true})>0;
-    $('#updBanner').hidden=!newer;if(newer)$('#updText').textContent='AeroDocs v'+j.version+' is available (you have v'+VER+'). Your documents and files stay on this device.';
+    $('#updDot').hidden=!newer;$('#updBanner').hidden=!newer;if(newer)$('#updText').textContent='AeroDocs v'+j.version+' is available (you have v'+VER+'). Your documents and files stay on this device.';
     if(manual)$('#updState').textContent=newer?'v'+j.version+' available':'Up to date (v'+VER+')';
+    return newer;
   }).catch(function(){if(manual)$('#updState').textContent='Could not reach the server'});
 }
 async function doUpdate(){
