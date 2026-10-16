@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroDocs">
 <meta name="theme-color" content="#edf1f5">
-<meta name="description" content="AeroDocs v1.013 — pilot document expiry tracker">
+<meta name="description" content="AeroDocs v1.014 — pilot document expiry tracker">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -265,7 +265,7 @@ input[type=date]{font-family:var(--f-mono)}
   <div class="wrap top-in">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><path d="M10 9h10l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1z" fill="var(--bg)"/><path d="M12 15h8M12 18.5h6" stroke="var(--ink-2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="23" cy="23" r="4.2" fill="var(--ok)" stroke="var(--ink)" stroke-width="1.6"/></svg>
-      <div><div class="wordmark">AERODOCS</div><div class="sub">Expiry tracker · <span id="verTag">v1.013</span></div></div>
+      <div><div class="wordmark">AERODOCS</div><div class="sub">Expiry tracker · <span id="verTag">v1.014</span></div></div>
     </div>
     <div class="top-r">
       <span class="today mono" id="todayLbl"></span>
@@ -307,7 +307,12 @@ input[type=date]{font-family:var(--f-mono)}
   <section id="tab-sync" data-tab hidden>
     <div><div class="eyebrow">Calendar sync</div><h2>Push expiries into your calendars</h2></div>
     <div class="panel">
-      <h3>Apple Calendar · master .ics</h3>
+      <h3>Auto-sync to iPhone Calendar</h3>
+      <p class="muted">Subscribe once. Every change in AeroDocs updates your iPhone Calendar by itself, alarms included.</p>
+      <div id="feedBox" class="form"></div>
+    </div>
+    <div class="panel">
+      <h3>Apple Calendar · one-time .ics file</h3>
       <p class="muted">One file with every document. Each expiry carries built-in alarms (<span id="leadsTxt"></span>) at <span id="alarmTimeTxt"></span>, plus a renewal-action event on each document's threshold date.</p>
       <div class="row"><button class="btn primary" data-act="bulk-ics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Bulk sync all expiries (.ics)</button><button class="btn" data-act="ics-mine">My documents only</button><button class="btn" data-act="ics-family">Family only</button></div><span class="note" id="bulkCount"></span>
     </div>
@@ -433,7 +438,7 @@ input[type=date]{font-family:var(--f-mono)}
 <script>
 (function(){
 'use strict';
-var VER='1.013', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
+var VER='1.014', BUILD='2026-10-15', KEY='aerodocs.v1', UIKEY='aerodocs.ui';
 var inFrame=(function(){try{return window.self!==window.top}catch(e){return true}})();
 var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 var isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
@@ -486,11 +491,11 @@ function load(){
   if(!d||!Array.isArray(d.docs)||(!d.docs.length&&!raw)){try{var bk=JSON.parse(localStorage.getItem(KEY+'.bak')||'null');if(bk&&Array.isArray(bk.docs)&&bk.docs.length){d=bk;loadOK=true;setTimeout(function(){toast('Restored '+bk.docs.length+' documents from the safety copy')},800)}}catch(e){}}
   if(raw&&!d)loadOK=false;
   d=d||{};
-  return {ver:VER,docs:Array.isArray(d.docs)?d.docs:[],family:Array.isArray(d.family)?d.family:[],settings:Object.assign({},DEF_SET,d.settings||{}),email:Object.assign({},DEF_EM,d.email||{}),sent:d.sent||{},log:Array.isArray(d.log)?d.log:[],lastAuto:d.lastAuto||0,lastBackup:d.lastBackup||0};
+  return {ver:VER,docs:Array.isArray(d.docs)?d.docs:[],family:Array.isArray(d.family)?d.family:[],settings:Object.assign({},DEF_SET,d.settings||{}),email:Object.assign({},DEF_EM,d.email||{}),cal:Object.assign({token:'',gistId:'',login:'',auto:true,family:true,last:0,lastSig:'',err:'',count:0},d.cal||{}),sent:d.sent||{},log:Array.isArray(d.log)?d.log:[],lastAuto:d.lastAuto||0,lastBackup:d.lastBackup||0};
 }
-function save(){
+function save(fromFeed){
   if(!loadOK&&!S.docs.length){toast('Not saved: existing data could not be read. Nothing was overwritten.');return}
-  try{S.ver=VER;var js=JSON.stringify(S);localStorage.setItem(KEY,js);if(S.docs.length)localStorage.setItem(KEY+'.bak',js);storageOK=true}
+  try{S.ver=VER;var js=JSON.stringify(S);localStorage.setItem(KEY,js);if(S.docs.length)localStorage.setItem(KEY+'.bak',js);storageOK=true;if(!fromFeed&&typeof scheduleFeed==='function')scheduleFeed()}
   catch(e){storageOK=false;toast('Not saved: browser storage is unavailable here')}}
 var UI=(function(){try{return JSON.parse(localStorage.getItem(UIKEY)||'null')||{}}catch(e){return {}}})();
 UI.tab=UI.tab||'docs'; UI.filter=UI.filter||'all';
@@ -708,6 +713,7 @@ function renderDocs(){
 /* ---------- render: sync ---------- */
 function leadsList(thr){var s={};s[thr]=1;S.settings.leads.forEach(function(l){s[l]=1});s[0]=1;return Object.keys(s).map(Number).sort(function(a,b){return b-a})}
 function renderSync(){
+  renderFeed();
   $('#leadsTxt').textContent=S.settings.leads.slice().sort(function(a,b){return b-a}).concat(['threshold','expiry day']).map(function(x){return typeof x==='number'?x+'d':x}).join(', ');
   $('#alarmTimeTxt').textContent=S.settings.alarmTime;
   var evN=0;S.docs.forEach(function(d){evN+=buildEvents(d).length});
@@ -757,8 +763,54 @@ function showTab(t,silent){
   if(!silent){var sc=$('#scroller');if(sc)sc.scrollTop=0}
 }
 
+/* ---------- auto-sync: subscribed calendar feed published to a secret GitHub gist ---------- */
+var FEED_FILE='aerodocs.ics',feedTimer=null,feedBusy=false;
+function feedCfg(){return S.cal}
+function feedURL(){var c=S.cal;return c.gistId&&c.login?'https://gist.githubusercontent.com/'+c.login+'/'+c.gistId+'/raw/'+FEED_FILE:''}
+function feedDocs(){return sortedOf(S.docs.filter(function(d){return !d.sample&&(S.cal.family||!d.owner)}))}
+function feedICS(){LITE=true;try{return icsFor(feedDocs(),'AeroDocs',true)}finally{LITE=false}}
+function feedSig(ics){return ics.split('\r\n').filter(function(l){return !/^(DTSTAMP|SEQUENCE):/.test(l)}).join('\n')}
+function gh(method,path,body){
+  return fetch('https://api.github.com'+path,{method:method,headers:{'Authorization':'Bearer '+S.cal.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})
+    .then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(e){}if(!r.ok){var er=new Error(r.status===401?'GitHub rejected the token. Create a new one with the gist scope.':r.status===404?'not-found':((j&&j.message)||('GitHub error '+r.status)));er.status=r.status;throw er}return j})});
+}
+async function feedPush(manual){
+  var c=S.cal;if(!c.token){if(manual)toast('Connect GitHub first');return}
+  if(inFrame){if(manual)toast('Calendar sync works in the installed app, not the Claude preview');return}
+  if(!navigator.onLine){c.err='Offline: will sync when back online';renderFeed();return}
+  if(feedBusy)return;feedBusy=true;renderFeed();
+  try{
+    var ics=feedICS(),sig=feedSig(ics);
+    if(!manual&&c.gistId&&sig===c.lastSig){feedBusy=false;renderFeed();return}
+    var body={description:'AeroDocs expiry calendar (private feed)',files:{}};body.files[FEED_FILE]={content:ics};
+    var j;
+    if(c.gistId){try{j=await gh('PATCH','/gists/'+c.gistId,body)}catch(e){if(e.status===404){c.gistId='';}else throw e}}
+    if(!c.gistId){body.public=false;j=await gh('POST','/gists',body);c.gistId=j.id;c.login=(j.owner&&j.owner.login)||c.login}
+    c.lastSig=sig;c.last=Date.now();c.err='';c.count=(ics.match(/BEGIN:VEVENT/g)||[]).length;save(true);
+    if(manual)toast('Calendar feed updated ('+c.count+' events)');
+  }catch(e){c.err=e.message||String(e);save(true);if(manual)toast(c.err)}
+  feedBusy=false;renderFeed();
+}
+function scheduleFeed(){if(!S.cal||!S.cal.token||!S.cal.auto||inFrame)return;clearTimeout(feedTimer);feedTimer=setTimeout(function(){feedPush(false)},4000)}
+function renderFeed(){
+  var c=S.cal,el=$('#feedBox');if(!el)return;var url=feedURL();
+  if(!c.token){el.innerHTML=
+    '<ol class="steps"><li>Tap <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=AeroDocs%20calendar" target="_blank" rel="noopener">Create GitHub token</a>, set Expiration to No expiration, scroll down and tap Generate token. Only the gist box is ticked.</li><li>Copy the token, paste it below and tap Connect.</li><li>Tap Subscribe in iPhone Calendar.</li></ol>'+
+    '<div class="field"><label for="ghTok">GitHub token (gist scope)</label><input id="ghTok" type="password" autocomplete="off" placeholder="ghp_…"></div>'+
+    '<div class="row"><button class="btn primary" data-act="feed-connect">Connect and create feed</button></div>'+
+    '<p class="note">The feed is a secret GitHub gist: not listed or searchable, but anyone with its link can read it. It holds document names and dates only: no reference numbers, notes or files. The token stays on this phone and is never included in backups.</p>';return}
+  el.innerHTML='<dl class="kv"><dt>Status</dt><dd>'+(feedBusy?'Syncing…':c.err?'<span style="color:var(--bad)">'+esc(c.err)+'</span>':c.last?'Synced '+new Date(c.last).toLocaleString()+' · '+(c.count||0)+' events':'Not synced yet')+'</dd><dt>Feed</dt><dd style="overflow-wrap:anywhere">'+(url?esc(url):'—')+'</dd></dl>'+
+    (url?'<div class="row"><a class="btn primary" href="'+esc(url.replace(/^https:/,'webcal:'))+'">'+IC.g+'Subscribe in iPhone Calendar</a><button class="btn" data-act="feed-copy">Copy link</button><a class="btn" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/render?cid='+encodeURIComponent(url.replace(/^https:/,'webcal:'))+'">Add to Google Calendar</a></div>':'')+
+    '<div class="row"><button class="btn" data-act="feed-sync"'+(feedBusy?' disabled':'')+'>Sync now</button><button class="btn danger" data-act="feed-off">Disconnect</button></div>'+
+    '<label class="check"><input type="checkbox" id="feedAuto"'+(c.auto?' checked':'')+'> Sync automatically after every change</label>'+
+    '<label class="check"><input type="checkbox" id="feedFam"'+(c.family?' checked':'')+'> Include family documents</label>'+
+    '<p class="note">Subscribe once. When iOS asks, turn <b>Remove Alerts</b> off so the reminders ring. iPhone Calendar refreshes subscribed calendars on its own schedule, usually within an hour; set it under Settings → Calendar → Accounts → Fetch New Data.</p>';
+}
+
 /* ---------- calendar: Google ---------- */
+var LITE=false;
 function descText(d,i){
+  if(LITE)return ['Document: '+d.name+(d.owner?' ('+ownerName(d)+')':''),'Expires: '+fmt(i.e),'Renew by: '+fmt(i.remind),d.critical?'FLIGHT-CRITICAL':'','— AeroDocs'].filter(Boolean).join('\n');
   var L=['Document: '+d.name+(d.owner?' ('+ownerName(d)+')':''),'Expires: '+fmt(i.e),'Alert threshold: '+i.thr+' days (renew by '+fmt(i.remind)+')'];
   if(i.win!=null)L.push('Revalidation window opens: '+fmt(i.win));
   if(d.authority)L.push('Issuer: '+d.authority);
@@ -804,9 +856,9 @@ function buildEvents(d){
   if(st.windowEvent&&i.win!=null&&i.win>=t)ev.push({uid:key+'-window@aerodocs',date:i.win,summary:'WINDOW OPENS · '+docLabel(d),desc:'Revalidation window opens today. Completing now keeps the current expiry date.\n'+desc,cats:cats,alarms:[{action:'DISPLAY',trigger:trig(0,st.alarmTime),desc:'Revalidation window open: '+d.name}]});
   return ev;
 }
-function icsFor(docs,calName){
+function icsFor(docs,calName,feed){
   var now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
-  var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//AeroDocs//Pilot Expiry Tracker '+VER+'//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:'+icsEsc(calName)];
+  var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//AeroDocs//Pilot Expiry Tracker '+VER+'//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:'+icsEsc(calName)];if(feed)L.push('REFRESH-INTERVAL;VALUE=DURATION:PT1H','X-PUBLISHED-TTL:PT1H','X-WR-CALDESC:Document expiries from AeroDocs');
   docs.forEach(function(d){buildEvents(d).forEach(function(e){
     L.push('BEGIN:VEVENT','UID:'+e.uid,'DTSTAMP:'+now,'DTSTART;VALUE=DATE:'+compact(e.date),'DTEND;VALUE=DATE:'+compact(e.date+1),'SUMMARY:'+icsEsc(e.summary),'DESCRIPTION:'+icsEsc(e.desc),'CATEGORIES:'+e.cats,'TRANSP:TRANSPARENT','STATUS:CONFIRMED','SEQUENCE:'+Math.floor(Date.now()/1000));
     e.alarms.forEach(function(a){L.push('BEGIN:VALARM','ACTION:'+a.action,'TRIGGER:'+a.trigger);if(a.action==='DISPLAY')L.push('DESCRIPTION:'+icsEsc(a.desc));L.push('END:VALARM')});
@@ -1375,7 +1427,7 @@ function exportSheet(){
    '<label class="check" style="margin-top:10px"><input type="checkbox" id="exFiles"'+(st.n?' checked':' disabled')+'> Include '+st.n+' attached file'+(st.n===1?'':'s')+' ('+kb(st.sz)+')</label>'+
    '<div class="sheet-f"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="exGo">Export</button></div>');
   $('#exGo').onclick=async function(){var wf=$('#exFiles').checked;this.disabled=true;
-    try{var data={app:'AeroDocs',ver:VER,exported:new Date().toISOString(),docs:S.docs,family:S.family,settings:S.settings,email:Object.assign({},S.email,{relayToken:''})};
+    try{var data={app:'AeroDocs',ver:VER,exported:new Date().toISOString(),docs:S.docs,family:S.family,settings:S.settings,email:Object.assign({},S.email,{relayToken:''}),cal:Object.assign({},S.cal,{token:''})};
       if(wf){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});var all=await FS.all();
         data.files=all.filter(function(r){return keep[r.id]}).map(function(r){return {id:r.id,docId:r.docId,name:r.name,type:r.type,size:r.size,created:r.created,b64:bufToB64(r.buf)}})}
       S.lastBackup=Date.now();save();closeSheet();renderAll();deliver('aerodocs-backup-'+compact(todayN())+(wf?'-with-files':'')+'.json','application/json',JSON.stringify(data,null,wf?0:2));
@@ -1457,6 +1509,10 @@ document.addEventListener('click',function(ev){
    case 'member-del-yes':deleteMember(id);break;
    case 'fam-filter':UI.famFilter=b.getAttribute('data-f');saveUI();renderFamily();break;
    case 'ics-mine':if(!mine().length){toast('No documents of yours yet');break}deliver('aerodocs-my-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sortedOf(mine()),'AeroDocs · Mine'));break;
+   case 'feed-connect':var tk=($('#ghTok').value||'').trim();if(!/^(ghp_|github_pat_|gho_)[A-Za-z0-9_]{20,}$/.test(tk)){toast('Paste the whole token: it starts with ghp_ or github_pat_');break}S.cal.token=tk;S.cal.err='';save(true);feedPush(true);break;
+   case 'feed-sync':feedPush(true);break;
+   case 'feed-copy':var fu=feedURL();if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(fu).then(function(){toast('Link copied')}).catch(function(){toast(fu)})}else toast(fu);break;
+   case 'feed-off':confirmSheet('Disconnect calendar sync','AeroDocs stops updating the feed and forgets the token. Your iPhone keeps the last synced events until you delete the subscription (Settings → Calendar → Accounts). To remove the feed itself, delete the gist at gist.github.com.','Disconnect',true,function(){S.cal=Object.assign(S.cal,{token:'',err:'',last:0,lastSig:''});save(true);renderFeed();toast('Calendar sync disconnected')});break;
    case 'ics-family':if(!famDocs().length){toast('No family documents yet');break}deliver('aerodocs-family-expiries-'+compact(todayN())+'.ics','text/calendar;charset=utf-8',icsFor(sortedOf(famDocs()),'AeroDocs · Family'));break;
    case 'scan-cancel':if(SCAN)SCAN.cancel=true;SCAN=null;closeSheet();break;
    case 'scan-update':(function(job){if(!job)return;job.pick();SCAN=null;rekey(job.metas.map(function(m){return m.id}),id).then(function(){editor(id,{files:job.metas,detect:job.r})}).catch(function(e){toast('Could not attach files: '+e.message)})})(SCAN);break;
@@ -1502,12 +1558,13 @@ document.addEventListener('click',function(ev){
       S.docs.filter(function(x){return x.sample||gone[x.owner]}).forEach(function(d){(d.files||[]).forEach(function(f){FS.del(f.id).catch(function(){})})});S.docs=S.docs.filter(function(x){return !x.sample&&!gone[x.owner]});S.family=S.family.filter(function(m){return !gone[m.id]});save();renderAll();toast('Samples removed')});break;
    case 'export-json':exportSheet();break;
    case 'import-json':$('#importFile').click();break;
-   case 'clear-all':confirmSheet('Clear all data','Deletes every document, attached file, setting and email log stored on this device. Export a backup first if you need it.','Clear everything',true,function(){S={ver:VER,docs:[],family:[],settings:Object.assign({},DEF_SET),email:Object.assign({},DEF_EM),sent:{},log:[],lastAuto:0};try{localStorage.removeItem(KEY+'.bak')}catch(e){}save();FS.clear().catch(function(){});renderAll();toast('All data cleared')});break;
+   case 'clear-all':confirmSheet('Clear all data','Deletes every document, attached file, setting and email log stored on this device. Export a backup first if you need it.','Clear everything',true,function(){S={ver:VER,docs:[],family:[],settings:Object.assign({},DEF_SET),email:Object.assign({},DEF_EM),cal:{token:'',gistId:'',login:'',auto:true,family:true,last:0,lastSig:'',err:'',count:0},sent:{},log:[],lastAuto:0};try{localStorage.removeItem(KEY+'.bak')}catch(e){}save();FS.clear().catch(function(){});renderAll();toast('All data cleared')});break;
    case 'email-test':var m=emailCfgOK();if(m){toast(m);break}b.disabled=true;sendEmail('AeroDocs test email','Test from AeroDocs v'+VER+' on '+fmt(todayN())+'. Alerts are configured correctly.').then(function(){logIt('Test email sent to '+S.email.to);toast('Test email sent')}).catch(function(err){logIt('Test failed: '+(err&&err.message||err));toast(inFrame?'Blocked in Claude preview. Use the hosted copy.':'Test failed. See log.')}).then(function(){b.disabled=false;renderEmail()});break;
    case 'email-check':b.disabled=true;runCheck(true).then(function(){b.disabled=false});break;
    case 'copy-out':var ta=$('#txtOut');var done=function(){toast('Copied')};if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(done).catch(function(){ta.focus();ta.select();toast('Select all and copy')})}else{ta.focus();ta.select();toast('Select all and copy')}break;
   }
 });
+document.addEventListener('change',function(e){if(e.target.id==='feedAuto'){S.cal.auto=e.target.checked;save(true);if(S.cal.auto)feedPush(false)}if(e.target.id==='feedFam'){S.cal.family=e.target.checked;save(true);feedPush(false)}});
 $('#scrim').addEventListener('click',function(e){if(e.target===this)closeSheet()});
 document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(!$('#scrim2').hidden)closeViewer();else if(!$('#scrim').hidden)closeSheet()});
 $('#scrim2').addEventListener('click',function(e){if(e.target===this)closeViewer()});
@@ -1543,7 +1600,8 @@ function bindSettings(){
 }
 bindSettings();
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme)}catch(e){}
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){renderAll();autoCheck();checkUpdate(false)}});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){renderAll();autoCheck();checkUpdate(false);if(S.cal.token&&S.cal.auto)feedPush(false)}});
+window.addEventListener('online',function(){if(S.cal.token&&S.cal.auto)feedPush(false)});
 
 function autoCheck(){if(inFrame||!S.email.auto||S.email.provider==='off')return;if(Date.now()-S.lastAuto<6*3600e3)return;runCheck(false)}
 
@@ -1573,6 +1631,7 @@ if(!inFrame&&'serviceWorker' in navigator&&(location.protocol==='https:'||locati
 renderAll();
 autoCheck();
 checkUpdate(false);
+if(S.cal.token&&S.cal.auto)setTimeout(function(){feedPush(false)},2500);
 setTimeout(function(){if(!loadOK||!storageOK||!S.docs.length)return;FS.all().then(function(all){var keep={};S.docs.forEach(function(d){(d.files||[]).forEach(function(f){keep[f.id]=1})});
   (all||[]).forEach(function(r){if(r.temp&&!keep[r.id]&&Date.now()-Date.parse(r.created||0)>6*3600e3)FS.del(r.id)})}).catch(function(){})},8000);
 if(!inFrame)askPersist();
